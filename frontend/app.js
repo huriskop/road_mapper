@@ -19,7 +19,9 @@
   const STATUS_URGENCY = { completed: 0, in_progress: 1, awaiting_repair: 2 };
 
   const cssVar = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  const colorFor = (field, value) => cssVar(field === "severity" ? `--sev-${value}` : `--st-${value}`);
+  const PREFIX = { severity: "--sev-", repair_status: "--st-", defect_type: "--dt-" };
+  const colorFor = (field, value) => cssVar(`${PREFIX[field]}${value}`);
+  const TYPE_ORDER = { unclassified: 0, crack: 1, bump: 2, pothole: 3 };
 
   const state = {
     filters: { start: "", end: "", defect_type: new Set(), severity: new Set(), repair_status: new Set() },
@@ -154,6 +156,8 @@
       let worst;
       if (state.colorBy === "severity") {
         worst = items.reduce((a, b) => (SEV_WEIGHT[b.severity] > SEV_WEIGHT[a.severity] ? b : a)).severity;
+      } else if (state.colorBy === "defect_type") {
+        worst = items.reduce((a, b) => (TYPE_ORDER[b.defect_type] > TYPE_ORDER[a.defect_type] ? b : a)).defect_type;
       } else {
         worst = items.reduce((a, b) => (STATUS_URGENCY[b.repair_status] > STATUS_URGENCY[a.repair_status] ? b : a)).repair_status;
       }
@@ -273,7 +277,10 @@
     const crit = (s.by_severity.critical || 0) + (s.by_severity.high || 0);
     $("#stats").innerHTML =
       `<span><b>${s.incidents}</b> incidents</span><span><b>${open}</b> open</span>` +
-      `<span><b>${crit}</b> high/critical</span><span><b>${s.packets}</b> reports</span><span><b>${s.devices}</b> devices</span>`;
+      `<span><b>${crit}</b> high/critical</span><span><b>${s.packets}</b> reports</span><span><b>${s.devices}</b> devices</span>` +
+      `<span><b>${s.new_this_week ?? 0}</b> new this week</span>`;
+    const backlog = s.review_backlog || 0;
+    $("#review-link").textContent = backlog ? `Review queue (${backlog})` : "Review queue";
   }
 
   async function refreshAll() {

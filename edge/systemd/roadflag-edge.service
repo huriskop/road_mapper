@@ -1,0 +1,17 @@
+[Unit]
+Description=Road defect flagger (edge device)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=capstone
+WorkingDirectory=/home/capstone/roadflag/edge
+ExecStart=/home/capstone/roadflag/.venv/bin/python -m roadflag_edge.app --config /home/capstone/roadflag/edge/config.yaml
+Restart=always
+RestartSec=3
+# IMU thread first: a little more CPU priority than the default
+Nice=-5
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target

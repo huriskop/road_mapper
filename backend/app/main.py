@@ -2,12 +2,15 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
+import hashlib
 import json
+import logging
 from datetime import datetime
 from enum import Enum
 from typing import Any
 
-from fastapi import APIRouter, FastAPI, HTTPException, Query, Request
+from fastapi import APIRouter, FastAPI, HTTPException, Query, Request, Response
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
@@ -20,7 +23,11 @@ from .db import SORT_COLUMNS, Database, IncidentFilters
 from .events import EventBus
 from .models import (
     DefectType,
+    EvidenceStatus,
     IncidentPatch,
+    ObservationMetadata,
+    ObservationReview,
+    ObservationStatus,
     RepairStatus,
     Severity,
     TelemetryMetadata,
@@ -29,6 +36,9 @@ from .models import (
     to_utc_iso,
 )
 from .storage import ImageError, LocalImageStorage, decode_base64_image, sniff_image_type
+from .worker import ReviewConflict, Worker
+
+log = logging.getLogger(__name__)
 
 
 def _parse_multi(values: list[str] | None, enum: type[Enum], name: str) -> list[str]:
@@ -102,12 +112,166 @@ async def _read_telemetry(request: Request) -> tuple[TelemetryMetadata, bytes]:
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or Settings()
     db = Database(settings.db_path, settings.media_url_prefix)
+    db.sync_devices(settings.device_tokens)
     storage = LocalImageStorage(settings.media_dir, settings.max_image_bytes)
     bus = EventBus()
+    worker = Worker(db, storage, settings)
+    wake = asyncio.Event()
 
-    app = FastAPI(title="Road Defect Monitoring & Mapping API", version="1.0.0")
-    app.state.settings, app.state.db, app.state.bus = settings, db, bus
+    def publish_result(res: dict[str, Any]) -> None:
+        bus.publish("observation.updated", {"id": res["observation_id"], "status": res["status"]})
+        inc = res.get("incident")
+        if inc:
+            bus.publish("incident.created" if inc["incident_created"] else "incident.updated",
+                        {"id": inc["incident_id"]})
+
+    async def worker_loop() -> None:
+        while True:
+            try:
+                res = await run_in_threadpool(worker.run_once)
+            except Exception:  # never let the loop die
+                log.exception("worker loop error")
+                res = None
+            if res is None:
+                wake.clear()
+                with contextlib.suppress(asyncio.TimeoutError):
+                    await asyncio.wait_for(wake.wait(), 2.0)
+                continue
+            publish_result(res)
+
+    @contextlib.asynccontextmanager
+    async def lifespan(_app: FastAPI):
+        task = asyncio.create_task(worker_loop()) if settings.worker_enabled else None
+        yield
+        if task:
+            task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await task
+
+    app = FastAPI(title="Road Defect Monitoring & Mapping API", version="1.1.0", lifespan=lifespan)
+    app.state.settings, app.state.db, app.state.bus, app.state.worker = settings, db, bus, worker
     api = APIRouter(prefix="/api/v1")
+
+    # ------------------------------------------------- edge observations (Pi)
+    @api.post("/observations", status_code=201)
+    async def ingest_observation(request: Request, response: Response) -> dict[str, Any]:
+        """Pi upload: multipart `metadata` (shared/observation.schema.json) + optional `image` JPEG.
+        Headers: Authorization: Bearer <device token>, Idempotency-Key: <observation_id>.
+        201 new, 200 + the same receipt for a repeat; 409 if the ID was used for other content."""
+        auth = request.headers.get("authorization", "")
+        token = auth[7:].strip() if auth.lower().startswith("bearer ") else ""
+        device = db.device_for_token(token) if token else None
+        if device is None:
+            raise HTTPException(401, "unknown or missing device token")
+        ctype = request.headers.get("content-type", "")
+        if not ctype.startswith("multipart/form-data"):
+            raise HTTPException(415, "use multipart/form-data with parts 'metadata' and 'image'")
+        form = await request.form()
+        raw_meta = form.get("metadata")
+        if isinstance(raw_meta, UploadFile):
+            raw_meta = (await raw_meta.read()).decode("utf-8", "replace")
+        if not raw_meta:
+            raise HTTPException(422, "metadata part is required")
+        try:
+            meta = ObservationMetadata.model_validate(json.loads(raw_meta))
+        except json.JSONDecodeError as exc:
+            raise HTTPException(422, f"metadata is not JSON: {exc.msg}") from exc
+        except ValidationError as exc:
+            raise HTTPException(422, json.loads(exc.json(include_url=False))) from exc
+        if meta.device_id != device:
+            raise HTTPException(403, f"token belongs to device '{device}', not '{meta.device_id}'")
+        if request.headers.get("idempotency-key") != meta.observation_id:
+            raise HTTPException(400, "Idempotency-Key header must equal metadata.observation_id")
+        upload = form.get("image")
+        image = await upload.read() if isinstance(upload, UploadFile) else None
+        if meta.evidence_status == EvidenceStatus.AVAILABLE and not image:
+            raise HTTPException(422, "evidence_status AVAILABLE needs the image part")
+        if image and meta.evidence_status != EvidenceStatus.AVAILABLE:
+            raise HTTPException(422, f"evidence_status {meta.evidence_status.value} must not carry an image")
+        if image:
+            if len(image) > settings.max_image_bytes:
+                raise HTTPException(413, f"image exceeds {settings.max_image_bytes // (1024 * 1024)} MB limit")
+            try:
+                sniff_image_type(image)
+            except ImageError as exc:
+                raise HTTPException(422, str(exc)) from exc
+            if hashlib.sha256(image).hexdigest() != meta.image_sha256:
+                raise HTTPException(422, "image_sha256 does not match the image")
+        elif meta.image_sha256:
+            raise HTTPException(422, "image_sha256 given but no image part")
+        if meta.defect is not None:
+            min_lat, min_lng, max_lat, max_lng = settings.service_area
+            if not (min_lat <= meta.defect.lat <= max_lat and min_lng <= meta.defect.lon <= max_lng):
+                raise HTTPException(422, f"defect is outside the {settings.service_area_name} service area")
+        key = storage.save(image) if image else None
+        try:
+            receipt, created = db.insert_observation(meta.model_dump(mode="json"), key)
+        except ValueError as exc:
+            if key:
+                storage.delete(key)
+            raise HTTPException(409, str(exc)) from exc
+        except Exception:
+            if key:
+                storage.delete(key)
+            raise
+        if not created and key:
+            storage.delete(key)     # a retry: keep the first copy
+        db.touch_device(device, meta.firmware)
+        if created:
+            wake.set()
+            bus.publish("observation.created", {"id": meta.observation_id})
+        response.status_code = 201 if created else 200
+        return receipt
+
+    @api.get("/observations")
+    async def list_observations(
+        status: list[str] | None = Query(None),
+        limit: int = Query(50, ge=1, le=500),
+        offset: int = Query(0, ge=0),
+    ) -> dict[str, Any]:
+        statuses = _parse_multi(status, ObservationStatus, "status")
+        items, total = db.list_observations(statuses, limit, offset)
+        return {"items": items, "total": total}
+
+    @api.get("/observations/{obs_id}")
+    async def get_observation(obs_id: str) -> dict[str, Any]:
+        obs = db.get_observation(obs_id)
+        if obs is None:
+            raise HTTPException(404, "observation not found")
+        return obs
+
+    @api.patch("/observations/{obs_id}/review")
+    async def review_observation(obs_id: str, body: ObservationReview) -> dict[str, Any]:
+        """A person confirms (with a label) or rejects a NEEDS_REVIEW observation."""
+        try:
+            res = await run_in_threadpool(worker.review, obs_id, body.decision.value, body.label)
+        except LookupError as exc:
+            raise HTTPException(404, str(exc)) from exc
+        except ReviewConflict as exc:
+            raise HTTPException(409, str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from exc
+        publish_result(res)
+        return db.get_observation(obs_id)
+
+    @api.get("/defects")
+    async def defects_geojson(
+        bbox: str | None = Query(None, description="west,south,east,north"),
+        label: list[str] | None = Query(None),
+        status: list[str] | None = Query(None, description="repair status"),
+        since: datetime | None = None,
+    ) -> dict[str, Any]:
+        """GeoJSON FeatureCollection, one feature per defect (incident)."""
+        box = None
+        if bbox:
+            try:
+                box = tuple(float(v) for v in bbox.split(","))
+                assert len(box) == 4
+            except (ValueError, AssertionError):
+                raise HTTPException(422, "bbox must be west,south,east,north")
+        return db.defects_geojson(box, _parse_multi(label, DefectType, "label"),
+                                  _parse_multi(status, RepairStatus, "status"),
+                                  to_utc_iso(since) if since else None)
 
     # -------------------------------------------------------------- ingestion
     @api.post("/telemetry", status_code=201)
@@ -252,6 +416,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     # ------------------------------------------------------------ live events
     @api.get("/events")
+    @api.get("/stream")
     async def events(request: Request) -> StreamingResponse:
         queue = bus.subscribe()
 
@@ -284,6 +449,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         @app.get("/test", include_in_schema=False)
         async def test_page() -> FileResponse:
             return FileResponse(settings.frontend_dir / "test.html")
+
+        @app.get("/review", include_in_schema=False)
+        async def review_page() -> FileResponse:
+            return FileResponse(settings.frontend_dir / "review.html")
 
     return app
 

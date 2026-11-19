@@ -44,6 +44,32 @@ python simulator/simulate.py --images-dir test_images/real   # simulated vehicle
 Real test photos live in `test_images/real/{pothole,crack,bump}/` (freely licensed, see
 `CREDITS.tsv`). Put your own regression photos in `test_images/user/<type>/` (not committed).
 
+## Edge device and observation pipeline
+
+The Raspberry Pi side (MPU6050 + NEO-6M + camera) lives in [`edge/`](edge/README.md): it detects a
+hit on the vertical acceleration, picks the camera frame that showed the spot 4 m earlier, stores
+it crash-safely and uploads it once. The upload contract is `shared/observation.schema.json`.
+
+```
+# server: give each Pi a token
+RDM_DEVICE_TOKENS="rpi4-01:<token>" python -m uvicorn app.main:app --app-dir backend --port 8000
+```
+
+- `POST /api/v1/observations`: Pi upload (multipart `metadata` + `image`, `Authorization: Bearer`,
+  `Idempotency-Key: <observation_id>`). 201 new, 200 + same receipt for a retry, 409 if the ID
+  was reused for other content. A background worker checks image quality, runs the camera
+  detector and decides `CONFIRMED` (>= 0.70), `NEEDS_REVIEW` or `REJECTED`.
+- Confirmed observations join a defect with the same label within 8 m and a heading within 45°
+  (`RDM_DEDUPE_RADIUS_M`, `RDM_HEADING_TOLERANCE_DEG`), else create one.
+- **Review queue** (`http://127.0.0.1:8000/review`): confirm (with a label) or reject the
+  observations the worker could not settle. API: `GET /api/v1/observations?status=NEEDS_REVIEW`,
+  `PATCH /api/v1/observations/{id}/review`.
+- `GET /api/v1/defects?bbox=w,s,e,n&label=&status=&since=`: GeoJSON, one feature per defect.
+  `GET /api/v1/stream` is the same Server-Sent Events feed as `/api/v1/events`.
+
+Without the trained models in `models/`, the worker cannot trust a "nothing found" or a heuristic
+pothole, so those observations go to the review queue instead of being decided automatically.
+
 ## 1. Accelerometer algorithm (potholes vs. bumps)
 
 1. **Works at any phone angle**: a 0.3 Hz low-pass gives the gravity direction. Projecting each sample onto it gives the vertical acceleration.

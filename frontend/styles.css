@@ -21,6 +21,11 @@
   --st-awaiting_repair: #e0482f;
   --st-in_progress: #2f6fde;
   --st-completed: #3aa676;
+  /* defect type palette */
+  --dt-pothole: #e0302a;
+  --dt-crack: #f08c2a;
+  --dt-bump: #2f6fde;
+  --dt-unclassified: #9aa3b2;
 }
 
 * { box-sizing: border-box; }

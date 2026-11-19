@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "roadflag/observation.schema.json",
+  "title": "Road defect observation (one pass over one spot)",
+  "description": "Metadata part of POST /api/v1/observations. The JPEG goes in the 'image' part; image_sha256 is its SHA-256. Shared by edge/ (writer) and backend/ (validator).",
+  "type": "object",
+  "required": ["schema_version", "observation_id", "device_id", "evidence_status", "t_impact_mono_ns"],
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": {"const": 1},
+    "observation_id": {"type": "string", "format": "uuid"},
+    "device_id": {"type": "string", "minLength": 1, "maxLength": 64},
+    "evidence_status": {
+      "enum": ["AVAILABLE", "LOW_SPEED", "INSUFFICIENT_TRAJECTORY", "BUFFER_MISS",
+               "ALIGNMENT_REJECTED", "NO_GPS_FIX", "NO_CAMERA_DATA"]
+    },
+    "t_impact_mono_ns": {"type": "integer", "description": "device monotonic clock, for debugging only"},
+    "t_impact_utc": {"type": ["string", "null"], "format": "date-time"},
+    "t_frame_utc": {"type": ["string", "null"], "format": "date-time"},
+    "utc_estimated": {"type": "boolean", "description": "true when UTC came from the GPS clock mapping"},
+    "alignment_error_ms": {"type": ["number", "null"]},
+    "speed_before_mps": {"type": ["number", "null"], "minimum": 0},
+    "lookahead_m": {"type": "number", "minimum": 0},
+    "defect": {"$ref": "#/$defs/latlon"},
+    "vehicle_at_frame": {"$ref": "#/$defs/latlon"},
+    "heading_deg": {"type": ["number", "null"], "minimum": 0, "maximum": 360},
+    "hdop": {"type": ["number", "null"], "minimum": 0},
+    "imu": {
+      "type": "object",
+      "properties": {
+        "peak_az_mps2": {"type": "number"},
+        "peak_jz_mps3": {"type": "number"},
+        "score": {"type": "number"},
+        "axle2_seen": {"type": "boolean"},
+        "gyro_peak_dps": {"type": "number"},
+        "horiz_peak_mps2": {"type": "number"}
+      }
+    },
+    "image_sha256": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$"},
+    "firmware": {"type": "string"}
+  },
+  "$defs": {
+    "latlon": {
+      "type": ["object", "null"],
+      "required": ["lat", "lon"],
+      "properties": {
+        "lat": {"type": "number", "minimum": -90, "maximum": 90},
+        "lon": {"type": "number", "minimum": -180, "maximum": 180}
+      }
+    }
+  }
+}

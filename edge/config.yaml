@@ -1,0 +1,42 @@
+# Road defect flagger - edge device settings. Every key is optional (defaults in config.py).
+device_id: rpi4-01
+data_dir: ~/roadflag/data
+mount_file: ~/roadflag/data/mount.json     # written by tools/calibrate_mount.py
+budget_mb: 2048                            # evidence on disk; accepted files are pruned first
+
+imu:
+  rate_hz: 200
+  dlpf: 2                                  # ~94 Hz
+  read_interval_ms: 50                     # FIFO holds 425 ms at 200 Hz
+
+gps:
+  port: /dev/serial0
+  baud: 38400
+  rate_hz: 5
+  nmea_latency_ms: 80                      # fix time = sentence arrival - this
+  configure_on_start: true                 # UBX: 38400 baud, 5 Hz, RMC+GGA only, saved
+
+camera:
+  width: 1280                              # 1280x720 YUV420 x 120 frames ~ 166 MB (4 GB Pi)
+  height: 720
+  fps: 24
+  exposure_us: 1500                        # fixed short exposure limits motion blur
+  ring_seconds: 5
+  frame_time_offset_ms: 0                  # from tools/latency_led_test.py
+
+detector:                                  # tune with tools/replay.py on recorded drives
+  tau_a0: 6.0                              # m/s^2
+  tau_a1: 0.10                             # m/s^2 per m/s
+  tau_j0: 600.0                            # m/s^3
+  tau_j1: 5.0
+  wheelbase_m: 2.7
+
+evidence:
+  lookahead_m: 4.0                         # measure with tools/calibrate_lookahead.py
+  antenna_to_front_wheel_m: 1.5            # tape measure, along the car
+  min_speed_mps: 2.0
+  tolerance_ms: 30
+
+uplink:
+  server_url: http://127.0.0.1:8000
+  token_file: ~/roadflag/device_token      # one line; must match RDM_DEVICE_TOKENS on the server
