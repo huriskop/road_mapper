@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Road Defect Monitor</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo" aria-hidden="true"></span>
+      <h1>Road Defect Monitor</h1>
+    </div>
+    <div class="stats" id="stats"></div>
+    <div class="live" id="live-indicator" title="Live updates"><span class="dot"></span><span class="label">connecting…</span></div>
+  </header>
+
+  <main class="layout">
+    <!-- ======================= FILTER PANEL ======================= -->
+    <aside class="filters" aria-label="Filters">
+      <h2>Filters</h2>
+      <label class="field">
+        <span>From</span>
+        <input type="datetime-local" id="f-start" />
+      </label>
+      <label class="field">
+        <span>To</span>
+        <input type="datetime-local" id="f-end" />
+      </label>
+
+      <fieldset class="multi" id="f-defect_type"><legend>Defect type</legend></fieldset>
+      <fieldset class="multi" id="f-severity"><legend>Severity</legend></fieldset>
+      <fieldset class="multi" id="f-repair_status"><legend>Repair status</legend></fieldset>
+
+      <div class="filter-actions">
+        <button class="btn" id="f-reset" type="button">Reset</button>
+      </div>
+
+      <h2>Map layers</h2>
+      <label class="check"><input type="checkbox" id="layer-markers" checked /> Markers</label>
+      <label class="check"><input type="checkbox" id="layer-heat" /> Heatmap</label>
+      <label class="field">
+        <span>Color pins by</span>
+        <select id="color-by">
+          <option value="severity">Severity</option>
+          <option value="repair_status">Repair status</option>
+        </select>
+      </label>
+      <div class="legend" id="legend"></div>
+    </aside>
+
+    <!-- ========================== MAP ============================= -->
+    <section class="map-wrap">
+      <div id="map" aria-label="Incident map"></div>
+      <button class="btn map-float" id="log-show" type="button" hidden>▲ Show incident log</button>
+    </section>
+
+    <!-- ===================== DASHBOARD LOG ======================== -->
+    <section class="log" aria-label="Incident log">
+      <div class="log-head">
+        <h2>Incident log <span class="muted" id="log-total"></span></h2>
+        <div class="log-tools">
+          <label class="field inline">
+            <span>Rows</span>
+            <select id="page-size">
+              <option>10</option><option selected>20</option><option>50</option><option>100</option>
+            </select>
+          </label>
+          <button class="btn" id="log-hide" type="button" title="Hide the incident log and enlarge the map">▼ Hide log</button>
+        </div>
+      </div>
+      <div class="table-scroll">
+        <table class="table" id="log-table">
+          <thead>
+            <tr>
+              <th>Photo</th>
+              <th>Coordinates</th>
+              <th class="sortable" data-sort="created_at">Date / Time</th>
+              <th class="sortable" data-sort="defect_type">Defect type</th>
+              <th class="sortable" data-sort="severity">Severity</th>
+              <th class="sortable" data-sort="repair_status">Repair status</th>
+              <th class="sortable num" data-sort="report_count">Reports</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+        <div class="empty" id="log-empty" hidden>No incidents match the current filters.</div>
+      </div>
+      <nav class="pager" aria-label="Pagination">
+        <button class="btn" id="pg-prev" type="button">‹ Prev</button>
+        <span id="pg-info"></span>
+        <button class="btn" id="pg-next" type="button">Next ›</button>
+      </nav>
+    </section>
+  </main>
+
+  <!-- ================== MARKER DETAIL DRAWER ====================== -->
+  <aside class="drawer" id="drawer" aria-hidden="true" aria-label="Incident details">
+    <button class="drawer-close" id="drawer-close" type="button" aria-label="Close">×</button>
+    <div id="drawer-body"></div>
+  </aside>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+  <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+  <script src="https://unpkg.com/leaflet.gridlayer.googlemutant@0.16.0/dist/Leaflet.GoogleMutant.js"></script>
+  <script src="/static/app.js"></script>
+</body>
+</html>

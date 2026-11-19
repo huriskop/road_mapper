@@ -1,0 +1,88 @@
+ROAD DEFECT MONITORING & MAPPING SYSTEM: TECHNICAL SPECIFICATION & IMPLEMENTATION PLAN
+========================================================================================
+
+1. PROJECT OVERVIEW
+-------------------
+This system is an automated road surface anomaly detection and visualization platform. Edge devices mounted on vehicles monitor vibration signals using onboard sensors. When an anomaly is detected, the device captures an image and transmits telemetry data (photo, timestamp, GPS coordinates, and preliminary sensor metrics) to a central backend server. The server aggregates these reports, clusters spatial duplicates from multiple devices, and renders the data on an interactive web map and administrative dashboard.
+
+NOTE ON SIMULATED TELEMETRY:
+During development and testing, live hardware sensor streams and incoming edge device telemetry packets will be simulated via mock scripts/generators sending synthetic JSON payloads, GPS coordinates, and sample road images to the backend API.
+
+
+2. CORE DATA ARCHITECTURE & AGGREGATION LOGIC
+---------------------------------------------
+2.1 Incoming Payload (Edge Device -> Server)
+Each data packet (real or simulated) sent by an edge device should include:
+- device_id: Unique identifier of the reporting hardware unit (or virtual simulated device ID).
+- timestamp: ISO 8601 UTC date and time of detection.
+- location: { "lat": float, "lng": float } (GPS coordinates).
+- image: Binary file or Base64-encoded photo of the road surface.
+- sensor_metadata: (Optional) Simulated or real vibration intensity/peak values to assist with automated severity classification.
+
+2.2 Spatial Clustering (Multi-Device Aggregation)
+- Proximity Grouping: If multiple packets arrive from different devices within a configurable spatial radius (e.g., 3-5 meters) and represent an unresolved defect, the server must group them under a single Incident Node rather than creating duplicate map markers.
+- Media Aggregation: All photos associated with the grouped packets are attached to the single Incident Node as an image gallery/carousel.
+
+2.3 Incident Node Schema (Database Model)
+- id: UUID (Primary Key).
+- coordinates: Spatial Point (lat, lng).
+- created_at: Timestamp of the initial report.
+- updated_at: Timestamp of the most recent report or status edit.
+- images: Array of image URLs + respective timestamps and device_ids.
+- defect_type: Enum (pothole, bump, crack, unclassified).
+- severity: Enum (false_positive, no_repair_needed, low, medium, high, critical).
+- repair_status: Enum (awaiting_repair, in_progress, completed).
+- report_count: Integer (number of unique device detections at this point).
+
+
+3. FRONTEND UI/UX REQUIREMENTS
+------------------------------
+3.1 Interactive Web Map
+- Layer Modes:
+  * Marker Layer: Displays individual Incident Nodes as color-coded pins based on severity or repair_status. Supports marker clustering at low zoom levels.
+  * Heatmap Layer: Visualizes defect density and severity concentration across road networks. Toggleable on/off or viewable simultaneously with markers.
+- Marker Detail Popup / Drawer (On Click):
+  When a user clicks a map marker, display a structured card containing the following elements in exact vertical order:
+  1. Media Gallery: Primary photo (or a swipeable carousel/grid if multiple packets were sent from the same location by different devices).
+  2. Timestamp: Date and time of detection (and latest report timestamp if clustered).
+  3. Defect Type: Editable dropdown/badge (Pothole, Bump, Crack).
+  4. Severity Level: Editable dropdown/badge (False Positive, No Repair Needed, Low, Medium, High, Critical).
+  5. Repair Status: Editable dropdown/badge (Awaiting Repair, In Progress, Completed).
+  6. Action Controls: Standard administrative buttons (Edit, Save Changes, Delete Incident).
+
+3.2 Logs & Analytics Dashboard
+- Log Table: Paginated, tabular view of all recorded Incident Nodes showing thumbnail, coordinates/address, timestamp, defect type, severity, repair status, and report count.
+- Filtering: Multi-criteria filter panel supporting:
+  * Date/Time range picker.
+  * Defect Type (multi-select).
+  * Severity Level (multi-select).
+  * Repair Status (multi-select).
+- Sorting: Sortable columns by Date/Time (newest/oldest), Severity (highest/lowest), Repair Status, and Report Count.
+- Map Synchronization: Clicking a row in the dashboard log highlights and centers the corresponding marker on the web map.
+
+
+4. STEP-BY-STEP IMPLEMENTATION PLAN
+-----------------------------------
+Phase 1: Backend & Spatial Database Setup
+1. Set up the database with spatial indexing support and define the Incident and ReportPacket relational schemas.
+2. Build the POST /api/v1/telemetry ingestion endpoint to handle multipart form data (JSON metadata + image file).
+3. Implement spatial clustering logic to merge incoming packets within a set radius into existing active incidents.
+4. Configure file/object storage for image uploads and generate accessible URLs.
+5. Build API endpoints for CRUD operations (GET /incidents, PATCH /incidents/:id, DELETE /incidents/:id) with query parameters for filtering and sorting.
+
+Phase 2: Telemetry Simulator & Data Generation
+1. Build a data simulation script that mimics multiple edge devices traveling along virtual routes.
+2. Generate synthetic sensor vibration readings, GPS coordinates (including overlapping coordinates from different simulated device_ids), timestamps, and attach sample defect photos.
+3. Stream simulated packets to POST /api/v1/telemetry to populate the database and verify spatial clustering behavior.
+
+Phase 3: Map Visualization & Marker Inspection
+1. Initialize the web map interface with base map tiles.
+2. Implement the Marker Layer with custom severity-based icons and zoom-level clustering.
+3. Implement the Heatmap Layer weighted by incident severity and report frequency.
+4. Build the Marker Detail Popup/Sidebar component strictly following the required field hierarchy (Photo Carousel -> Date/Time -> Defect Type -> Severity -> Repair Status -> Edit/Delete actions).
+
+Phase 4: Dashboard, Filtering & State Management
+1. Build the Dashboard Log view with a responsive data table.
+2. Connect filter controls (date range, defect type, severity, status) and sorting headers to the backend query API.
+3. Implement real-time or optimistic UI updates when an operator edits an incident's severity, status, or deletes a false positive.
+4. Link the dashboard rows to the map viewport so selecting a log entry pans/zooms to the exact GPS location.
