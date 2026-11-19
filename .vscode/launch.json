@@ -1,0 +1,73 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Web app: server (http://127.0.0.1:8000)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "uvicorn",
+      "args": ["app.main:app", "--app-dir", "backend", "--port", "8000"],
+      "env": { "RDM_DATA_DIR": "${workspaceFolder}/data_real", "RDM_DETECT": "pothole,crack,speed_bump" },
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Web app: simulator (send test data)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/simulator/simulate.py",
+      "args": ["--time-scale", "30", "--images-dir", "test_images/real", "--kinds", "pothole"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Vision detector: evaluate on real photos",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/test_images/evaluate.py",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Sensor detector: demo",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/sensor_detector.py",
+      "args": ["--demo", "--plot", "demo_trip.png"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Vision detector: demo",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/vision_detector.py",
+      "args": ["--demo"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Sensor detector: my CSV",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/sensor_detector.py",
+      "args": ["${input:csvFile}", "--plot", "trip.png", "--json", "events.json"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Vision detector: my image/video",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/vision_detector.py",
+      "args": ["${input:mediaFile}", "-o", "${input:outFile}", "--json", "defects.json"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    }
+  ],
+  "inputs": [
+    { "id": "csvFile", "type": "promptString", "description": "Path to accelerometer CSV", "default": "trip.csv" },
+    { "id": "mediaFile", "type": "promptString", "description": "Path to road image or video", "default": "road.jpg" },
+    { "id": "outFile", "type": "promptString", "description": "Output file (out.jpg or out.mp4)", "default": "out.jpg" }
+  ]
+}

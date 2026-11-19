@@ -13,6 +13,7 @@ Examples
     python simulator/simulate.py --devices 10 --defects 40 --passes 3
     python simulator/simulate.py --time-scale 20       # real-time-ish streaming (20x)
     python simulator/simulate.py --images-dir ./samples  # use your own road photos
+                                 # (subfolders pothole/ crack/ bump/ are matched to the defect type)
     python simulator/simulate.py --base64              # send JSON + base64 instead of multipart
 """
 from __future__ import annotations
@@ -124,6 +125,7 @@ class Event:
     hint: str
     truth: int | None  # ground-truth defect index, None = false trigger
     window: list[float]
+    edge_hint: str | None = None  # on-device vibration guess, kept when `hint` is overridden
 
 
 # ---------------------------------------------------------------- signal + detection
@@ -260,8 +262,15 @@ def synth_road_image(rng: random.Random, kind: str | None, caption: str) -> byte
 
 
 def load_sample_images(folder: Path) -> list[Path]:
+    """All photos in `folder`, including subfolders (e.g. pothole/, crack/, bump/)."""
     exts = {".jpg", ".jpeg", ".png", ".webp"}
-    return sorted(p for p in folder.iterdir() if p.suffix.lower() in exts)
+    return sorted(p for p in folder.rglob("*") if p.suffix.lower() in exts)
+
+
+def pick_sample(rng: random.Random, samples: list[Path], kind: str | None) -> Path:
+    """Prefer a photo from a subfolder named after the defect kind; else any photo."""
+    matching = [p for p in samples if kind and p.parent.name.lower() == kind]
+    return rng.choice(matching or samples)
 
 
 # --------------------------------------------------------------------------- main
@@ -271,7 +280,9 @@ def build_world(args, rng: random.Random):
     for i in range(args.defects):
         r = rng.choice(routes)
         s = rng.uniform(20, r.length - 20)
-        kind = rng.choices(list(DEFECT_PROFILES), weights=[5, 2, 3])[0]
+        kinds = [k for k in DEFECT_PROFILES if not args.kinds or k in args.kinds]
+        weights = [{"pothole": 5, "bump": 2, "crack": 3}[k] for k in kinds]
+        kind = rng.choices(kinds, weights=weights)[0]
         lo, hi = DEFECT_PROFILES[kind][0]
         x, y = r.at(s)
         defects.append(Defect(i, r, s, kind, rng.uniform(lo, hi), x, y))
@@ -288,6 +299,8 @@ def post_event(session: requests.Session, url: str, ev: Event, image: bytes, mim
             "sample_rate_hz": SAMPLE_HZ, "defect_type_hint": ev.hint, "window_g": ev.window,
         },
     }
+    if ev.edge_hint is not None:
+        meta["sensor_metadata"]["edge_hint"] = ev.edge_hint
     if use_b64:
         meta["image"] = f"data:{mime};base64," + base64.b64encode(image).decode()
         resp = session.post(url, json=meta, timeout=30)
@@ -312,10 +325,18 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--false-rate", type=float, default=0.004, help="false triggers per second of driving")
     p.add_argument("--time-scale", type=float, default=0, help="0 = send as fast as possible; N = replay at N x real time")
     p.add_argument("--images-dir", type=Path, help="folder of sample road photos to use instead of synthetic ones")
+    p.add_argument("--kinds", type=lambda s: [k.strip() for k in s.split(",") if k.strip()],
+                   help="only these defect types, e.g. pothole,crack. False triggers are dropped and each "
+                        "report carries its true type (as if a camera confirmed it); the vibration "
+                        "guess is kept as edge_hint")
     p.add_argument("--base64", action="store_true", help="send JSON with base64 image instead of multipart")
     p.add_argument("--seed", type=int, default=None)
     p.add_argument("--dry-run", action="store_true", help="simulate only; do not send")
     args = p.parse_args(argv)
+    if args.kinds is not None:
+        bad = [k for k in args.kinds if k not in DEFECT_PROFILES]
+        if bad or not args.kinds:
+            p.error(f"unknown --kinds {bad}; choose from {list(DEFECT_PROFILES)}")
 
     rng = random.Random(args.seed)
     lat0, lng0 = (float(v) for v in args.center.split(","))
@@ -336,6 +357,10 @@ def main(argv: list[str] | None = None) -> int:
             t0 = start + timedelta(minutes=pss * 90 + rng.uniform(0, 60))
             events += drive(rng, frame, device_id, route, defects, t0, args.gps_sigma, args.hit_prob, args.false_rate)
     events.sort(key=lambda e: e.t)
+    if args.kinds:
+        events = [e for e in events if e.truth is not None]
+        for e in events:
+            e.edge_hint, e.hint = e.hint, defects[e.truth].kind
 
     true_hits = {e.truth for e in events if e.truth is not None}
     print(f"world: {len(routes)} routes, {len(defects)} defects ({len(true_hits)} detected at least once)")
@@ -353,12 +378,12 @@ def main(argv: list[str] | None = None) -> int:
         if args.time_scale > 0 and prev_t is not None:
             time.sleep(max(0.0, (ev.t - prev_t).total_seconds() / args.time_scale))
         prev_t = ev.t
+        kind = defects[ev.truth].kind if ev.truth is not None else None
         if samples:
-            path = rng.choice(samples)
+            path = pick_sample(rng, samples, kind)
             image = path.read_bytes()
             mime = {".png": "image/png", ".webp": "image/webp"}.get(path.suffix.lower(), "image/jpeg")
         else:
-            kind = defects[ev.truth].kind if ev.truth is not None else None
             image = synth_road_image(rng, kind, f"{ev.device_id}  {ev.t:%Y-%m-%d %H:%M:%S}Z  {ev.peak_g:.2f}g")
             mime = "image/jpeg"
         try:

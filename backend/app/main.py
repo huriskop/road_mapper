@@ -11,8 +11,10 @@ from fastapi import APIRouter, FastAPI, HTTPException, Query, Request
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
+from starlette.concurrency import run_in_threadpool
 from starlette.datastructures import UploadFile
 
+from . import vision
 from .config import Settings
 from .db import SORT_COLUMNS, Database, IncidentFilters
 from .events import EventBus
@@ -26,7 +28,7 @@ from .models import (
     extract_peak,
     to_utc_iso,
 )
-from .storage import ImageError, LocalImageStorage, decode_base64_image
+from .storage import ImageError, LocalImageStorage, decode_base64_image, sniff_image_type
 
 
 def _parse_multi(values: list[str] | None, enum: type[Enum], name: str) -> list[str]:
@@ -114,10 +116,23 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         min_lat, min_lng, max_lat, max_lng = settings.service_area
         if not (min_lat <= meta.location.lat <= max_lat and min_lng <= meta.location.lng <= max_lng):
             raise HTTPException(422, f"location is outside the {settings.service_area_name} service area")
+        found = None
         try:
+            sniff_image_type(image_bytes)  # reject non-images before running the detector
+            if settings.annotate_images:
+                image_bytes, found = await run_in_threadpool(vision.annotate, image_bytes, settings.detect)
+                if found is not None:
+                    meta.sensor_metadata = {**(meta.sensor_metadata or {}), "vision": found}
             image_key = storage.save(image_bytes)
         except ImageError as exc:
             raise HTTPException(422, str(exc)) from exc
+        # Type: the camera's pothole / speed-bump finding beats the vibration guess; camera cracks
+        # (image rules, less reliable) are only used when the sensor gave no type at all.
+        hint, hint_source = extract_defect_hint(meta.sensor_metadata), "sensor"
+        if found and found.get("camera_type"):
+            hint, hint_source = DefectType(found["camera_type"]), "camera"
+        elif found and found.get("cracks") and hint in (None, DefectType.unclassified):
+            hint, hint_source = DefectType.crack, "camera"
         try:
             result = db.ingest_packet(
                 device_id=meta.device_id,
@@ -127,7 +142,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 image_path=image_key,
                 sensor_metadata=meta.sensor_metadata,
                 peak=extract_peak(meta.sensor_metadata),
-                defect_hint=extract_defect_hint(meta.sensor_metadata),
+                defect_hint=hint,
+                hint_source=hint_source,
                 radius_m=settings.cluster_radius_m,
             )
         except Exception:
@@ -136,6 +152,32 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         bus.publish("incident.created" if result["incident_created"] else "incident.updated",
                     {"id": result["incident_id"]})
         return result
+
+    # ------------------------------------------------------ test a single photo
+    @api.post("/analyze")
+    async def analyze_photo(request: Request) -> dict[str, Any]:
+        """Run the detector on one uploaded photo and return the labelled image + detections.
+        Multipart form: `image` (file), optional `detect` (comma-separated: pothole, crack, speed_bump)
+        and `conf` (pothole confidence cut-off, 0-1). Nothing is saved."""
+        form = await request.form()
+        upload = form.get("image")
+        if not isinstance(upload, UploadFile):
+            raise HTTPException(422, "send the photo as a multipart file field named 'image'")
+        data = await upload.read()
+        if len(data) > settings.max_image_bytes:
+            raise HTTPException(422, f"image exceeds {settings.max_image_bytes // (1024 * 1024)} MB limit")
+        detect = tuple(k.strip() for k in str(form.get("detect") or ",".join(settings.detect)).split(",")
+                       if k.strip() in ("pothole", "crack", "speed_bump")) or settings.detect
+        try:
+            conf = min(0.95, max(0.05, float(form.get("conf") or 0.5)))
+        except ValueError:
+            raise HTTPException(422, "conf must be a number between 0 and 1")
+        try:
+            return await run_in_threadpool(vision.analyze_photo, data, detect, conf)
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from exc
+        except RuntimeError as exc:
+            raise HTTPException(503, str(exc)) from exc
 
     # ------------------------------------------------------------------ reads
     @api.get("/incidents")
@@ -238,6 +280,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         @app.get("/", include_in_schema=False)
         async def index() -> FileResponse:
             return FileResponse(settings.frontend_dir / "index.html")
+
+        @app.get("/test", include_in_schema=False)
+        async def test_page() -> FileResponse:
+            return FileResponse(settings.frontend_dir / "test.html")
 
     return app
 

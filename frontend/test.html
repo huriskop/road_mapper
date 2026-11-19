@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Test a Photo · Road Defect Monitor</title>
+  <style>
+    :root {
+      --bg: #f4f5f7; --panel: #ffffff; --text: #1d2330; --muted: #6b7385; --border: #e1e4ea;
+      --accent: #2f6fde; --accent-soft: #e7efff; --danger: #d23b3b; --ok: #2e8b57; --radius: 10px;
+      --pothole: #e0302a; --crack: #1f8fe0; --bump: #2a9a40;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font: 14px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--text); background: var(--bg); }
+    header { background: var(--panel); border-bottom: 1px solid var(--border); padding: 12px max(16px, env(safe-area-inset-left)); display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+    header h1 { font-size: 17px; margin: 0; }
+    header a { color: var(--accent); text-decoration: none; font-weight: 500; }
+    header a:hover { text-decoration: underline; }
+    main { max-width: 1200px; margin: 0 auto; padding: 20px 16px 48px; display: grid; gap: 20px; }
+
+    .controls { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; display: grid; gap: 14px; }
+    .drop { border: 2px dashed var(--border); border-radius: var(--radius); padding: 28px 16px; text-align: center; cursor: pointer; background: var(--bg); transition: border-color .15s, background .15s; }
+    .drop:hover, .drop.over { border-color: var(--accent); background: var(--accent-soft); }
+    .drop:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+    .drop strong { display: block; font-size: 16px; margin-bottom: 4px; }
+    .drop span { color: var(--muted); }
+    .opts { display: flex; flex-wrap: wrap; gap: 18px 28px; align-items: center; }
+    .opts fieldset { border: 0; padding: 0; margin: 0; display: flex; gap: 14px; align-items: center; }
+    .opts legend { float: left; margin-right: 10px; font-weight: 600; }
+    .opts label { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+    .conf { display: flex; gap: 10px; align-items: center; }
+    .conf output { font-variant-numeric: tabular-nums; min-width: 3ch; font-weight: 600; }
+    .hint { color: var(--muted); margin: 0; font-size: 13px; }
+    #model-status { font-size: 13px; }
+    #model-status.warn { color: var(--danger); }
+
+    .results { display: grid; gap: 18px; }
+    .card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+    .card-head { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; padding: 12px 16px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+    .card-head h2 { font-size: 15px; margin: 0; overflow-wrap: anywhere; }
+    .card-head .meta { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+    .card-body { display: grid; grid-template-columns: 1fr 1fr 280px; }
+    figure { margin: 0; position: relative; background: #111; min-height: 160px; }
+    figure img { display: block; width: 100%; height: 100%; max-height: 460px; object-fit: contain; cursor: zoom-in; }
+    figcaption { position: absolute; left: 8px; top: 8px; background: rgba(0,0,0,.65); color: #fff; font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; padding: 4px 7px; border-radius: 4px; }
+    .found { padding: 14px 16px; display: grid; gap: 10px; align-content: start; min-width: 0; }
+    .verdict { font-size: 18px; font-weight: 700; }
+    .verdict.yes { color: var(--pothole); }
+    .verdict.no { color: var(--ok); }
+    .found ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+    .found li { display: flex; gap: 8px; align-items: center; border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; font-variant-numeric: tabular-nums; }
+    .swatch { width: 10px; height: 10px; border-radius: 2px; flex: none; }
+    .found li .what { font-weight: 600; }
+    .found li .sub { color: var(--muted); margin-left: auto; font-size: 12px; }
+    .loading { padding: 40px 16px; text-align: center; color: var(--muted); }
+    .error { padding: 16px; color: var(--danger); }
+    .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    button.btn { font: inherit; border: 1px solid var(--border); background: var(--panel); border-radius: 6px; padding: 6px 12px; cursor: pointer; }
+    button.btn:hover { border-color: var(--accent); color: var(--accent); }
+    button.btn:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+    .empty { color: var(--muted); text-align: center; padding: 8px; }
+
+    .report { border-top: 1px solid var(--border); padding-top: 12px; margin-top: 4px; display: grid; gap: 8px; }
+    .report-title { font-weight: 600; }
+    .latlng { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .latlng label { display: grid; gap: 2px; font-size: 12px; color: var(--muted); }
+    .latlng input { font: inherit; padding: 5px 7px; border: 1px solid var(--border); border-radius: 6px; min-width: 0; }
+    .hint.warn { color: var(--danger); }
+    .btn.primary, a.btn.primary { background: var(--accent); color: #fff; border: 1px solid var(--accent); border-radius: 6px; padding: 6px 12px; text-decoration: none; text-align: center; display: inline-block; }
+    .btn.primary:hover { filter: brightness(1.08); color: #fff; }
+    .btn:disabled { opacity: .6; cursor: default; }
+    dialog { border: 0; padding: 0; background: transparent; max-width: 96vw; }
+    dialog::backdrop { background: rgba(0,0,0,.85); }
+    dialog img { max-width: 96vw; max-height: 90vh; display: block; }
+
+    @media (max-width: 900px) { .card-body { grid-template-columns: 1fr 1fr; } .found { grid-column: 1 / -1; } }
+    @media (max-width: 560px) { .card-body { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Test a Photo</h1>
+    <a href="/">← Back to the map</a>
+    <span id="model-status" class="hint"></span>
+  </header>
+
+  <main>
+    <section class="controls" aria-label="Choose photos">
+      <div class="drop" id="drop" tabindex="0" role="button" aria-label="Choose road photos to test">
+        <strong>Drop road photos here, or click to choose</strong>
+        <span>JPEG, PNG or WebP · several at once is fine · nothing is saved to the map</span>
+      </div>
+      <input type="file" id="file" accept="image/jpeg,image/png,image/webp" multiple hidden />
+      <div class="opts">
+        <fieldset>
+          <legend>Look for</legend>
+          <label><input type="checkbox" id="d-pothole" checked /> Potholes</label>
+          <label><input type="checkbox" id="d-crack" checked /> Cracks</label>
+          <label><input type="checkbox" id="d-speed_bump" checked /> Speed bumps</label>
+        </fieldset>
+        <div class="conf">
+          <label for="conf">Pothole confidence cut-off</label>
+          <input type="range" id="conf" min="0.1" max="0.9" step="0.05" value="0.5" />
+          <output id="conf-out" for="conf">50%</output>
+        </div>
+        <div class="actions">
+          <button class="btn" type="button" id="rerun" disabled>Re-run with these settings</button>
+          <button class="btn" type="button" id="clear" disabled>Clear results</button>
+        </div>
+      </div>
+      <p class="hint">Lower the cut-off to catch more potholes (and more false alarms); raise it to keep only confident ones. Speed bumps use a fixed 50% cut-off. Speed bumps add about half a second per photo.</p>
+    </section>
+
+    <section class="results" id="results" aria-live="polite"></section>
+  </main>
+
+  <dialog id="zoom"><img id="zoom-img" alt="" /></dialog>
+
+  <script>
+    const $ = id => document.getElementById(id);
+    const COLORS = { pothole: "var(--pothole)", crack: "var(--crack)", bump: "var(--bump)" };
+    let files = [];
+
+    function el(tag, attrs = {}, ...kids) {
+      const n = document.createElement(tag);
+      for (const [k, v] of Object.entries(attrs)) {
+        if (k === "class") n.className = v; else if (k === "text") n.textContent = v; else n.setAttribute(k, v);
+      }
+      kids.forEach(k => k != null && n.append(k));
+      return n;
+    }
+
+    function settings() {
+      const detect = ["pothole", "crack", "speed_bump"].filter(k => $("d-" + k).checked);
+      return { detect: detect.length ? detect : ["pothole"], conf: $("conf").value };
+    }
+
+    function label(d) {
+      if (d.kind === "pothole") return "Pothole";
+      if (d.kind === "speed_bump") return "Speed bump";
+      return "Crack (" + d.kind.replace("_crack", "") + ")";
+    }
+    const colorOf = d => d.kind === "pothole" ? COLORS.pothole : d.kind === "speed_bump" ? COLORS.bump : COLORS.crack;
+    const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+
+    function zoomable(img) {
+      img.addEventListener("click", () => { $("zoom-img").src = img.src; $("zoom-img").alt = img.alt; $("zoom").showModal(); });
+      return img;
+    }
+
+    async function analyze(file) {
+      const s = settings();
+      const card = el("article", { class: "card" });
+      const head = el("div", { class: "card-head" }, el("h2", { text: file.name }), el("span", { class: "meta", text: "checking…" }));
+      const body = el("div", { class: "loading", text: "Running the detector…" });
+      card.append(head, body);
+      $("results").prepend(card);
+
+      const fd = new FormData();
+      fd.append("image", file);
+      fd.append("detect", s.detect.join(","));
+      fd.append("conf", s.conf);
+      try {
+        const res = await fetch("/api/v1/analyze", { method: "POST", body: fd });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.detail || `server answered ${res.status}`);
+        render(card, head, body, file, data);
+      } catch (err) {
+        head.querySelector(".meta").textContent = "failed";
+        body.replaceWith(el("div", { class: "error", text: "Could not test this photo: " + err.message }));
+      }
+    }
+
+    function render(card, head, placeholder, file, data) {
+      if (!data.pothole_model) {
+        $("model-status").textContent = "Pothole model file missing on the server (models/pothole_1class.onnx): using the older image rules for potholes. See models/README.md.";
+        $("model-status").classList.add("warn");
+      }
+      const pot = data.defects.filter(d => d.kind === "pothole");
+      const bmp = data.defects.filter(d => d.kind === "speed_bump");
+      const crk = data.defects.filter(d => d.kind.endsWith("_crack"));
+      head.querySelector(".meta").textContent =
+        `${data.width}×${data.height} px · ${data.time_ms} ms · looked for ${data.detect.join(" + ")}`;
+
+      const original = zoomable(el("img", { alt: `${file.name}, original`, src: URL.createObjectURL(file) }));
+      const labelled = zoomable(el("img", { alt: `${file.name}, with detections`, src: data.image }));
+
+      const found = el("div", { class: "found" });
+      const parts = [];
+      if (data.detect.includes("pothole")) parts.push(pot.length ? plural(pot.length, "pothole", "potholes") : "no potholes");
+      if (data.detect.includes("crack")) parts.push(crk.length ? plural(crk.length, "crack", "cracks") : "no cracks");
+      if (data.detect.includes("speed_bump")) parts.push(bmp.length ? plural(bmp.length, "speed bump", "speed bumps") : "no speed bumps");
+      found.append(el("div", { class: "verdict " + (pot.length || crk.length ? "yes" : "no"), text: parts.join(", ") }));
+      if (data.detect.includes("speed_bump") && !data.speed_bump_model) {
+        found.append(el("p", { class: "hint", text: "Speed bump model is not installed on the server (models/road_anomaly_7class.onnx)." }));
+      }
+
+      if (data.defects.length) {
+        const ul = el("ul");
+        for (const d of data.defects) {
+          const sw = el("span", { class: "swatch" }); sw.style.background = colorOf(d);
+          const sev = d.severity === "info" ? "" : d.severity;
+          const sub = [d.confidence != null ? `${Math.round(d.confidence * 100)}%` : "", sev].filter(Boolean).join(" · ");
+          ul.append(el("li", {}, sw, el("span", { class: "what", text: label(d) }), el("span", { class: "sub", text: sub })));
+        }
+        found.append(ul);
+      } else {
+        found.append(el("p", { class: "empty", text: "Nothing above the cut-off. Try a lower cut-off if you expected something." }));
+      }
+
+      found.append(reportForm(file, data));
+      const bodyEl = el("div", { class: "card-body" },
+        el("figure", {}, original, el("figcaption", { text: "Original" })),
+        el("figure", {}, labelled, el("figcaption", { text: "Detector" })),
+        found);
+      placeholder.replaceWith(bodyEl);
+    }
+
+    // ---- "Add to map": send the photo as a report, exactly like a vehicle would
+    let AREA = null;
+    fetch("/api/v1/config").then((r) => r.json()).then((c) => (AREA = c.service_area)).catch(() => {});
+    let formSeq = 0;
+
+    function exifTime(s) {        // "2024:05:01 14:03:22" -> ISO, or now
+      const m = /^(\d{4}):(\d{2}):(\d{2})[ T](\d{2}):(\d{2}):(\d{2})/.exec(s || "");
+      return m ? new Date(`${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6]}`).toISOString() : new Date().toISOString();
+    }
+
+    function reportForm(file, data) {
+      const n = ++formSeq;
+      const wrap = el("form", { class: "report", novalidate: "" });
+      const lat = el("input", { id: `lat-${n}`, type: "number", step: "any", placeholder: "37.4563", required: "" });
+      const lng = el("input", { id: `lng-${n}`, type: "number", step: "any", placeholder: "126.7052", required: "" });
+      if (data.gps) { lat.value = data.gps.lat; lng.value = data.gps.lng; }
+      const msg = el("p", { class: "hint", text: data.gps
+        ? "Location read from the photo's GPS data."
+        : "This photo has no GPS data. Enter where it was taken." });
+      const btn = el("button", { class: "btn primary", type: "submit", text: "Add to map" });
+      wrap.append(
+        el("div", { class: "report-title", text: "Report this photo on the map" }),
+        el("div", { class: "latlng" },
+          el("label", { for: `lat-${n}` }, "Latitude", lat),
+          el("label", { for: `lng-${n}` }, "Longitude", lng)),
+        msg, btn);
+
+      wrap.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const la = parseFloat(lat.value), ln = parseFloat(lng.value);
+        if (!isFinite(la) || !isFinite(ln)) { msg.textContent = "Enter a latitude and a longitude."; msg.className = "hint warn"; return; }
+        if (AREA && (la < AREA.south || la > AREA.north || ln < AREA.west || ln > AREA.east)) {
+          msg.textContent = `That point is outside the ${AREA.name} service area (lat ${AREA.south}–${AREA.north}, lng ${AREA.west}–${AREA.east}).`;
+          msg.className = "hint warn"; return;
+        }
+        btn.disabled = true; btn.textContent = "Adding…";
+        const meta = {
+          device_id: "CONSOLE-UPLOAD",
+          timestamp: exifTime(data.gps && data.gps.taken),
+          location: { lat: la, lng: ln },
+          sensor_metadata: { source: "console_upload", file_name: file.name },
+        };
+        const fd = new FormData();
+        fd.append("metadata", JSON.stringify(meta));
+        fd.append("image", file);
+        try {
+          const res = await fetch("/api/v1/telemetry", { method: "POST", body: fd });
+          const out = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(out.detail ? JSON.stringify(out.detail) : `server answered ${res.status}`);
+          wrap.replaceChildren(
+            el("div", { class: "report-title", text: out.incident_created ? "Added to the map as a new incident" : "Added to an existing incident nearby" }),
+            el("a", { class: "btn primary", href: `/#incident-${out.incident_id}`, text: "Open on the map →" }));
+        } catch (err) {
+          btn.disabled = false; btn.textContent = "Add to map";
+          msg.textContent = "Could not add it: " + err.message; msg.className = "hint warn";
+        }
+      });
+      return wrap;
+    }
+
+    async function runAll(list) {
+      if (!list.length) return;
+      $("rerun").disabled = $("clear").disabled = false;
+      for (const f of list) await analyze(f);   // one at a time keeps the server responsive
+    }
+
+    function addFiles(list) {
+      const imgs = [...list].filter(f => /^image\/(jpeg|png|webp)$/.test(f.type));
+      if (!imgs.length) return;
+      files = files.concat(imgs);
+      runAll(imgs);
+    }
+
+    $("drop").addEventListener("click", () => $("file").click());
+    $("drop").addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); $("file").click(); } });
+    $("file").addEventListener("change", e => { addFiles(e.target.files); e.target.value = ""; });
+    for (const ev of ["dragenter", "dragover"]) $("drop").addEventListener(ev, e => { e.preventDefault(); $("drop").classList.add("over"); });
+    for (const ev of ["dragleave", "drop"]) $("drop").addEventListener(ev, e => { e.preventDefault(); $("drop").classList.remove("over"); });
+    $("drop").addEventListener("drop", e => addFiles(e.dataTransfer.files));
+    document.addEventListener("paste", e => addFiles([...e.clipboardData.files]));
+    $("conf").addEventListener("input", () => { $("conf-out").textContent = Math.round($("conf").value * 100) + "%"; });
+    $("rerun").addEventListener("click", () => { $("results").replaceChildren(); runAll([...files].reverse()); });
+    $("clear").addEventListener("click", () => { files = []; $("results").replaceChildren(); $("rerun").disabled = $("clear").disabled = true; });
+    $("zoom").addEventListener("click", () => $("zoom").close());
+
+    fetch("/api/v1/stats").then(() => {
+      $("model-status").textContent = "Potholes and speed bumps: trained YOLOv8 models. Cracks: image rules.";
+    }).catch(() => {
+      $("model-status").textContent = "The server is not reachable. Start it, then reload this page.";
+      $("model-status").classList.add("warn");
+    });
+  </script>
+</body>
+</html>

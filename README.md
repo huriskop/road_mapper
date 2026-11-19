@@ -4,19 +4,45 @@ Two detectors that work together, because each sensor sees a different part of t
 
 | Defect | Accelerometer (`sensor_detector.py`) | Camera (`vision_detector.py`) |
 |---|---|---|
-| Pothole | yes (drop, then impact) | yes (dark, rough blob) |
-| Speed bump | yes (lift, then drop) | weak (often looks like flat road) |
+| Pothole | yes (drop, then impact) | yes: trained YOLOv8 pothole model (8 of 12 real test photos) |
+| Speed bump | yes (lift, then drop) | partly: painted / yellow-black striped bumps, plus a trained model |
 | Rough road / gravel | yes | partly |
-| Cracks (longitudinal / transverse / alligator) | no (too small to feel) | yes |
+| Cracks (longitudinal / transverse / alligator) | no (too small to feel) | yes: image rules, limited to the road surface |
 
 ```
 pip install -r requirements.txt
+# trained models (not in git, see models/README.md)
+curl.exe -L -o models/pothole_1class.onnx https://huggingface.co/peterhdd/pothole-detection-yolov8/resolve/main/best.onnx
+curl.exe -L -o models/road_anomaly_7class.onnx https://huggingface.co/Logesshhh/road-anomaly-pothole-yolov8m/resolve/main/pothole_yolov8.onnx
+
 python sensor_detector.py --demo                 # synthetic drive, prints detected events
 python sensor_detector.py trip.csv --json events.json --plot trip.png
 python vision_detector.py --demo                 # writes demo_input.jpg / demo_result.jpg
 python vision_detector.py road.jpg -o out.jpg --json defects.json
+python vision_detector.py road.jpg -o out.jpg --only pothole,speed_bump
 python vision_detector.py dashcam.mp4 -o out.mp4 --roi-top 0.55
+python test_images/evaluate.py                   # score all real test photos, save labelled copies
 ```
+
+## Web console
+
+```
+python -m uvicorn app.main:app --app-dir backend --port 8000
+python simulator/simulate.py --images-dir test_images/real   # simulated vehicles with real photos
+```
+
+- **Map** (`http://127.0.0.1:8000`): every photo a vehicle sends is run through the camera
+  detector and stored with labelled boxes. The camera's pothole / speed-bump finding sets the
+  incident type over the vehicle's vibration guess; an operator's edit outranks both. The
+  incident panel shows what the camera found in each photo and where the type came from.
+- **Test a photo** (`http://127.0.0.1:8000/test`): drop photos, see the labelled result, and
+  add them to the map (location from the photo's GPS data, or typed in). Test photos are not
+  saved unless you add them.
+- `RDM_DETECT=pothole,crack,speed_bump` chooses what the server's camera detector marks;
+  `RDM_ANNOTATE_IMAGES=0` turns it off.
+
+Real test photos live in `test_images/real/{pothole,crack,bump}/` (freely licensed, see
+`CREDITS.tsv`). Put your own regression photos in `test_images/user/<type>/` (not committed).
 
 ## 1. Accelerometer algorithm (potholes vs. bumps)
 

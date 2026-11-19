@@ -5,3 +5,13 @@ venv/
 *.mp4
 events.json
 defects.json
+
+# large model weights (see models/README.md) and local run data
+models/*.onnx
+data_real/
+
+data/
+test_images/results/
+demo_trip.png
+# your own test photos: often web images of unknown copyright, so kept out of the public repo
+test_images/user/

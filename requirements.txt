@@ -1,4 +1,16 @@
+# Web app (backend API + simulator)
+fastapi>=0.115
+uvicorn>=0.30  # [standard] extras skipped: pyyaml has no Python 3.15 wheel yet
+python-multipart>=0.0.9
+pillow>=10.0
+requests>=2.31
+
+# Detectors (sensor_detector.py, vision_detector.py)
 numpy>=1.24
 scipy>=1.10
 opencv-python>=4.8
 matplotlib>=3.7  # optional, for --plot
+
+# dev / tests
+pytest>=8.0
+httpx>=0.27

@@ -10,7 +10,7 @@
     repair_status: ["awaiting_repair", "in_progress", "completed"],
   };
   const LABELS = {
-    pothole: "Pothole", bump: "Bump", crack: "Crack", unclassified: "Unclassified",
+    pothole: "Pothole", bump: "Speed bump", crack: "Crack", unclassified: "Unclassified",
     false_positive: "False Positive", no_repair_needed: "No Repair Needed", low: "Low",
     medium: "Medium", high: "High", critical: "Critical",
     awaiting_repair: "Awaiting Repair", in_progress: "In Progress", completed: "Completed",
@@ -344,6 +344,7 @@
           ${images.length > 1 ? `<button class="nav prev" type="button" aria-label="Previous photo">‹</button><button class="nav next" type="button" aria-label="Next photo">›</button>` : ""}
           <div class="caption"><span id="cap-device"></span><span id="cap-index"></span></div>
         </div>
+        <div class="camera-found" id="cap-camera"></div>
         ${images.length > 1 ? `<div class="thumbs" id="thumbs">${images.map((im, i) => `<img src="${esc(im.url)}" data-i="${i}" alt="">`).join("")}</div>` : ""}`
         : `<div class="muted">No photos.</div>`}
       </div>
@@ -359,7 +360,8 @@
         </dl>
       </div>
 
-      <div class="section" id="sec-type"><div class="section-label">Defect type</div>${editable("defect_type", inc.defect_type)}</div>
+      <div class="section" id="sec-type"><div class="section-label">Defect type</div>${editable("defect_type", inc.defect_type)}
+        ${inc.type_source ? `<div class="type-source">${esc(TYPE_SOURCE[inc.type_source] || inc.type_source)}${cameraSummary(images)}</div>` : ""}</div>
       <div class="section" id="sec-sev"><div class="section-label">Severity level</div>${editable("severity", inc.severity)}</div>
       <div class="section" id="sec-status"><div class="section-label">Repair status</div>${editable("repair_status", inc.repair_status)}</div>
 
@@ -379,12 +381,40 @@
     $("#drawer").setAttribute("aria-hidden", "false");
   }
 
+  const TYPE_SOURCE = {
+    camera: "Classified by the camera",
+    sensor: "Classified from vibration (no camera confirmation)",
+    operator: "Set by an operator",
+  };
+
+  // What the photo detector found in one photo, e.g. "Pothole 89% · 3 cracks"
+  function cameraText(im) {
+    const v = im.sensor_metadata && im.sensor_metadata.vision;
+    if (!v) return "Camera: not checked";
+    const parts = [];
+    if (v.potholes) parts.push(`Pothole${v.potholes > 1 ? ` ×${v.potholes}` : ""}${v.pothole_confidence != null ? ` ${Math.round(v.pothole_confidence * 100)}%` : ""}`);
+    if (v.speed_bumps) parts.push(`Speed bump${v.speed_bump_confidence != null ? ` ${Math.round(v.speed_bump_confidence * 100)}%` : ""}`);
+    if (v.cracks) parts.push(`${v.cracks} crack mark${v.cracks > 1 ? "s" : ""}`);
+    return "Camera: " + (parts.join(" · ") || "nothing found");
+  }
+
+  // e.g. " · 3 of 4 photos show a pothole"
+  function cameraSummary(images) {
+    const verdicts = images.map((im) => im.sensor_metadata?.vision?.camera_type).filter(Boolean);
+    if (!verdicts.length) return "";
+    const counts = {};
+    verdicts.forEach((t) => (counts[t] = (counts[t] || 0) + 1));
+    const [top, n] = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
+    return ` · ${n} of ${images.length} photo${images.length === 1 ? "" : "s"} show${images.length === 1 ? "s" : ""} a ${label(top).toLowerCase()}`;
+  }
+
   function setupCarousel(images) {
     let idx = 0;
     const show = (i) => {
       idx = (i + images.length) % images.length;
       const im = images[idx];
       $("#slide").src = im.url;
+      $("#cap-camera").textContent = cameraText(im);
       $("#cap-device").textContent = `${im.device_id} · ${fmtDate(im.timestamp)}`;
       $("#cap-index").textContent = `${idx + 1}/${images.length}`;
       document.querySelectorAll("#thumbs img").forEach((t) => t.classList.toggle("active", +t.dataset.i === idx));
@@ -573,9 +603,16 @@
     document.addEventListener("keydown", (e) => { if (e.key === "Escape" && state.selectedId) closeDrawer(); });
   }
 
+  // Open an incident from a link such as /#incident-<id> (used by the photo test page).
+  function openFromHash() {
+    const m = /^#incident-([0-9a-f-]{36})$/i.exec(location.hash);
+    if (m) selectIncident(m[1], { pan: true });
+  }
+
   wire();
   renderLegend();
   setupBaseMap();
-  refreshAll();
+  refreshAll().then(openFromHash, openFromHash);
+  window.addEventListener("hashchange", openFromHash);
   connectEvents();
 })();

@@ -31,6 +31,12 @@ class Settings:
         float(v) for v in os.getenv("RDM_SERVICE_AREA", "37.30,126.10,37.82,126.80").split(",")
     )
     service_area_name: str = os.getenv("RDM_SERVICE_AREA_NAME", "Incheon")
+    # Run vision_detector.py on uploaded photos and store the labelled version (boxes + POTHOLE/CRACK).
+    annotate_images: bool = os.getenv("RDM_ANNOTATE_IMAGES", "1").lower() not in ("0", "false", "no")
+    # Which types the photo detector marks (comma-separated): pothole, crack, speed_bump.
+    detect: tuple[str, ...] = tuple(
+        k.strip() for k in os.getenv("RDM_DETECT", "pothole,crack,speed_bump").split(",") if k.strip()
+    )
 
     def __post_init__(self) -> None:
         if self.db_path is None:

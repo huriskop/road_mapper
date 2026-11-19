@@ -124,6 +124,99 @@ def test_filter_sort_paginate_delete(client):
     assert client.get("/api/v1/stats").json()["incidents"] == 3
 
 
+def test_uploaded_photo_is_annotated_by_vision_detector(client):
+    pytest.importorskip("cv2")
+    import cv2
+    sys.path.insert(0, str(ROOT))
+    import vision_detector
+
+    ok, buf = cv2.imencode(".jpg", vision_detector.synthetic_road())
+    meta = {"device_id": "CAM1", "timestamp": "2026-11-01T10:00:00Z", "location": {"lat": BASE[0], "lng": BASE[1]},
+            "sensor_metadata": {"peak_g": 0.9, "defect_type_hint": "pothole"}}
+    r = client.post("/api/v1/telemetry", data={"metadata": json.dumps(meta)},
+                    files={"image": ("road.jpg", buf.tobytes(), "image/jpeg")})
+    assert r.status_code == 201, r.text
+    inc = client.get(f"/api/v1/incidents/{r.json()['incident_id']}").json()
+    stored = client.get(inc["images"][0]["url"]).content
+    assert stored != buf.tobytes()                       # the labelled version was stored
+    img = cv2.imdecode(__import__("numpy").frombuffer(stored, "uint8"), cv2.IMREAD_COLOR)
+    red = (img[..., 2] > 200) & (img[..., 1] < 60) & (img[..., 0] < 60)
+    assert red.sum() > 500                               # red POTHOLE box drawn on the photo
+
+
+def test_analyze_endpoint_returns_detections_and_saves_nothing(client):
+    pytest.importorskip("cv2")
+    import cv2
+    sys.path.insert(0, str(ROOT))
+    import vision_detector
+
+    ok, buf = cv2.imencode(".jpg", vision_detector.synthetic_road())
+    r = client.post("/api/v1/analyze", data={"detect": "pothole,crack", "conf": "0.5"},
+                    files={"image": ("road.jpg", buf.tobytes(), "image/jpeg")})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["image"].startswith("data:image/jpeg;base64,")
+    assert {d["kind"] for d in body["defects"]} & {"longitudinal_crack", "transverse_crack", "alligator_crack"}
+    assert client.get("/api/v1/stats").json()["incidents"] == 0          # test photos never reach the map
+
+    r = client.post("/api/v1/analyze", files={"image": ("a.txt", b"hello", "text/plain")})
+    assert r.status_code == 422
+    assert client.get("/test").status_code == 200
+
+
+def test_camera_classification_beats_vibration_guess_but_not_operator(client):
+    photo = ROOT / "test_images" / "user" / "bump" / "rubber_bump_yellow_black.jpg"
+    if not photo.exists():
+        pytest.skip("user test photo not present")
+    pytest.importorskip("cv2")
+
+    def post(device, ts, hint):
+        meta = {"device_id": device, "timestamp": ts, "location": {"lat": BASE[0], "lng": BASE[1]},
+                "sensor_metadata": {"peak_g": 0.8, "defect_type_hint": hint}}
+        r = client.post("/api/v1/telemetry", data={"metadata": json.dumps(meta)},
+                        files={"image": ("bump.jpg", photo.read_bytes(), "image/jpeg")})
+        assert r.status_code == 201, r.text
+        return r.json()["incident_id"]
+
+    iid = post("D1", "2026-11-01T10:00:00Z", "pothole")          # vibration says pothole
+    inc = client.get(f"/api/v1/incidents/{iid}").json()
+    assert inc["defect_type"] == "bump" and inc["type_source"] == "camera"
+    assert inc["images"][0]["sensor_metadata"]["vision"]["camera_type"] == "bump"
+
+    client.patch(f"/api/v1/incidents/{iid}", json={"defect_type": "pothole"})   # operator overrides
+    post("D2", "2026-11-01T11:00:00Z", "bump")
+    inc = client.get(f"/api/v1/incidents/{iid}").json()
+    assert inc["defect_type"] == "pothole" and inc["type_source"] == "operator"
+
+
+def test_old_database_is_upgraded(tmp_path):
+    import sqlite3
+    from app.db import SCHEMA, Database
+    old_schema = SCHEMA.replace(
+        "defect_type_manual INTEGER NOT NULL DEFAULT 0,\n    type_source        TEXT NOT NULL DEFAULT 'sensor'   -- sensor | camera | operator\n",
+        "defect_type_manual INTEGER NOT NULL DEFAULT 0\n")
+    assert "type_source" not in old_schema
+    db_path = tmp_path / "road_defects.db"
+    conn = sqlite3.connect(db_path)
+    conn.executescript(old_schema)
+    conn.execute("INSERT INTO incidents (id, lat, lng, created_at, updated_at, last_report_at, defect_type_manual) "
+                 "VALUES ('a', 37.4, 126.7, 'x', 'x', 'x', 1)")
+    conn.commit(); conn.close()
+    Database(db_path)
+    conn = sqlite3.connect(db_path)
+    assert conn.execute("SELECT type_source FROM incidents").fetchone()[0] == "operator"
+
+
+def test_annotation_can_be_switched_off(tmp_path):
+    app = create_app(Settings(data_dir=tmp_path, annotate_images=False))
+    with TestClient(app) as c:
+        raw = jpeg()
+        meta = {"device_id": "D1", "timestamp": "2026-11-01T10:00:00Z", "location": {"lat": BASE[0], "lng": BASE[1]}}
+        r = c.post("/api/v1/telemetry", data={"metadata": json.dumps(meta)}, files={"image": ("a.jpg", raw, "image/jpeg")})
+        inc = c.get(f"/api/v1/incidents/{r.json()['incident_id']}").json()
+        assert c.get(inc["images"][0]["url"]).content == raw
+
+
 def test_rejects_packets_outside_incheon(client):
     meta = {"device_id": "D1", "timestamp": "2026-11-01T10:00:00Z", "location": {"lat": 37.5665, "lng": 126.9780}}  # Seoul
     r = client.post("/api/v1/telemetry", data={"metadata": json.dumps(meta)}, files={"image": ("a.jpg", jpeg(), "image/jpeg")})

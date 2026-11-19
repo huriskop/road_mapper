@@ -47,7 +47,8 @@ CREATE TABLE IF NOT EXISTS incidents (
     packet_count       INTEGER NOT NULL DEFAULT 0,
     peak_intensity     REAL,
     severity_manual    INTEGER NOT NULL DEFAULT 0,
-    defect_type_manual INTEGER NOT NULL DEFAULT 0
+    defect_type_manual INTEGER NOT NULL DEFAULT 0,
+    type_source        TEXT NOT NULL DEFAULT 'sensor'   -- sensor | camera | operator
 );
 CREATE INDEX IF NOT EXISTS ix_incidents_created  ON incidents(created_at);
 CREATE INDEX IF NOT EXISTS ix_incidents_status   ON incidents(repair_status);
@@ -129,6 +130,11 @@ class Database:
         self._ingest_lock = threading.Lock()
         with self.connect() as conn:
             conn.executescript(SCHEMA)
+            # upgrade databases created before the camera classified incidents
+            cols = {r["name"] for r in conn.execute("PRAGMA table_info(incidents)")}
+            if "type_source" not in cols:
+                conn.execute("ALTER TABLE incidents ADD COLUMN type_source TEXT NOT NULL DEFAULT 'sensor'")
+                conn.execute("UPDATE incidents SET type_source = 'operator' WHERE defect_type_manual = 1")
 
     @contextmanager
     def connect(self) -> Iterator[sqlite3.Connection]:
@@ -172,7 +178,10 @@ class Database:
         peak: float | None,
         defect_hint: DefectType | None,
         radius_m: float,
+        hint_source: str = "sensor",
     ) -> dict[str, Any]:
+        """hint_source: "camera" when defect_hint comes from the photo detector, else "sensor".
+        Camera findings outrank the vibration guess; an operator's edit outranks both."""
         packet_id = str(uuid.uuid4())
         now = utc_now_iso()
         meta_json = json.dumps(sensor_metadata) if sensor_metadata is not None else None
@@ -186,10 +195,12 @@ class Database:
                     severity = classify_severity(peak) or Severity.low
                     conn.execute(
                         """INSERT INTO incidents (id, lat, lng, created_at, updated_at, last_report_at,
-                               defect_type, severity, repair_status, report_count, packet_count, peak_intensity)
-                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'awaiting_repair', 1, 1, ?)""",
+                               defect_type, severity, repair_status, report_count, packet_count, peak_intensity,
+                               type_source)
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'awaiting_repair', 1, 1, ?, ?)""",
                         (incident_id, lat, lng, timestamp, timestamp, timestamp,
-                         (defect_hint or DefectType.unclassified).value, severity.value, peak),
+                         (defect_hint or DefectType.unclassified).value, severity.value, peak,
+                         hint_source if defect_hint else "sensor"),
                     )
                     created = True
                 else:
@@ -201,7 +212,7 @@ class Database:
                     (packet_id, incident_id, device_id, timestamp, lat, lng, image_path, meta_json, now),
                 )
                 if not created:
-                    self._merge_into(conn, target, timestamp, peak, defect_hint)
+                    self._merge_into(conn, target, timestamp, peak, defect_hint, hint_source)
                 conn.execute("COMMIT")
             except BaseException:
                 conn.execute("ROLLBACK")
@@ -216,7 +227,8 @@ class Database:
             "packet_count": row["packet_count"],
         }
 
-    def _merge_into(self, conn, target: sqlite3.Row, timestamp: str, peak: float | None, hint: DefectType | None) -> None:
+    def _merge_into(self, conn, target: sqlite3.Row, timestamp: str, peak: float | None, hint: DefectType | None,
+                    hint_source: str = "sensor") -> None:
         incident_id = target["id"]
         agg = conn.execute(
             """SELECT AVG(lat) AS lat, AVG(lng) AS lng, COUNT(DISTINCT device_id) AS devices, COUNT(*) AS packets,
@@ -232,18 +244,37 @@ class Database:
             auto = classify_severity(new_peak)
             if auto is not None:
                 severity = auto.value
-        defect_type = target["defect_type"]
-        if not target["defect_type_manual"] and defect_type == DefectType.unclassified.value and hint:
-            defect_type = hint.value
+        defect_type, source = target["defect_type"], target["type_source"]
+        if not target["defect_type_manual"]:
+            camera = self._camera_vote(conn, incident_id)
+            if camera:                                   # majority of the camera's verdicts
+                defect_type, source = camera, "camera"
+            elif defect_type == DefectType.unclassified.value and hint:
+                defect_type, source = hint.value, hint_source
 
         conn.execute(
             """UPDATE incidents SET lat = ?, lng = ?, report_count = ?, packet_count = ?, peak_intensity = ?,
-                   severity = ?, defect_type = ?, created_at = MIN(created_at, ?),
+                   severity = ?, defect_type = ?, type_source = ?, created_at = MIN(created_at, ?),
                    last_report_at = ?, updated_at = MAX(updated_at, ?)
                WHERE id = ?""",
-            (agg["lat"], agg["lng"], agg["devices"], agg["packets"], new_peak, severity, defect_type,
+            (agg["lat"], agg["lng"], agg["devices"], agg["packets"], new_peak, severity, defect_type, source,
              agg["first_ts"], agg["last_ts"], timestamp, incident_id),
         )
+
+    @staticmethod
+    def _camera_vote(conn, incident_id: str) -> str | None:
+        """Most common camera classification among the incident's photos (ties: pothole first)."""
+        votes: dict[str, int] = {}
+        for (meta,) in conn.execute("SELECT sensor_metadata FROM report_packets WHERE incident_id = ?", (incident_id,)):
+            try:
+                kind = (json.loads(meta or "{}").get("vision") or {}).get("camera_type")
+            except (ValueError, AttributeError):
+                kind = None
+            if kind in (DefectType.pothole.value, DefectType.bump.value):
+                votes[kind] = votes.get(kind, 0) + 1
+        if not votes:
+            return None
+        return max(votes, key=lambda k: (votes[k], k == DefectType.pothole.value))
 
     # ------------------------------------------------------------------- reads
     def _image_url(self, path: str) -> str:
@@ -257,6 +288,7 @@ class Database:
             "updated_at": row["updated_at"],
             "last_report_at": row["last_report_at"],
             "defect_type": row["defect_type"],
+            "type_source": row["type_source"] if "type_source" in row.keys() else None,
             "severity": row["severity"],
             "repair_status": row["repair_status"],
             "report_count": row["report_count"],
@@ -360,6 +392,7 @@ class Database:
             sets.append("severity_manual = 1")
         if "defect_type" in changes:
             sets.append("defect_type_manual = 1")
+            sets.append("type_source = 'operator'")
         sets.append("updated_at = ?")
         params.append(utc_now_iso())
         with self.connect() as conn:
