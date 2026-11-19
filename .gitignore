@@ -1,18 +1,7 @@
-# Python
-.venv/
 __pycache__/
 *.pyc
-.pytest_cache/
-
-# Runtime data (SQLite DB and uploaded images, recreated on startup)
-data/
-
-# Environment / secrets
-.env
-.env.*
-
-# Editors / OS
-.vscode/
-.idea/
-Thumbs.db
-.DS_Store
+venv/
+.venv/
+*.mp4
+events.json
+defects.json

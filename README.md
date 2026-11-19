@@ -1,95 +1,73 @@
-# Road Defect Monitoring & Mapping System
+# Road defect detection: potholes, bumps, cracks
 
-Implementation of `road_defect_monitoring_technical_specification.txt`.
+Two detectors that work together, because each sensor sees a different part of the problem:
 
-| Part | Tech | Location |
+| Defect | Accelerometer (`sensor_detector.py`) | Camera (`vision_detector.py`) |
 |---|---|---|
-| Backend API + spatial DB | FastAPI, SQLite with an **R\*Tree** spatial index | `backend/app/` |
-| Image storage | Local disk, served at `/media/...` (swap `LocalImageStorage` for S3/MinIO) | `data/media/` |
-| Web map + dashboard | Vanilla JS, Leaflet, markercluster, leaflet.heat | `frontend/` |
-| Telemetry simulator | Python (requests + Pillow) | `simulator/simulate.py` |
-| Tests | pytest | `tests/` |
+| Pothole | yes (drop, then impact) | yes (dark, rough blob) |
+| Speed bump | yes (lift, then drop) | weak (often looks like flat road) |
+| Rough road / gravel | yes | partly |
+| Cracks (longitudinal / transverse / alligator) | no (too small to feel) | yes |
 
-## Quick start (Windows / PowerShell)
-
-```powershell
-py -m venv .venv
-.venv\Scripts\python -m pip install -r requirements.txt
-
-# 1. start the server  ->  http://127.0.0.1:8000  (API docs at /docs)
-.venv\Scripts\python -m uvicorn app.main:app --app-dir backend --port 8000
-
-# 2. in a second terminal, stream simulated edge devices
-.venv\Scripts\python simulator\simulate.py --seed 7
-.venv\Scripts\python simulator\simulate.py --time-scale 30   # slower "live" stream; watch the map update
+```
+pip install -r requirements.txt
+python sensor_detector.py --demo                 # synthetic drive, prints detected events
+python sensor_detector.py trip.csv --json events.json --plot trip.png
+python vision_detector.py --demo                 # writes demo_input.jpg / demo_result.jpg
+python vision_detector.py road.jpg -o out.jpg --json defects.json
+python vision_detector.py dashcam.mp4 -o out.mp4 --roi-top 0.55
 ```
 
-Run the tests with `.venv\Scripts\python -m pytest`.
+## 1. Accelerometer algorithm (potholes vs. bumps)
 
-### Configuration (environment variables)
+1. **Works at any phone angle**: a 0.3 Hz low-pass gives the gravity direction. Projecting each sample onto it gives the vertical acceleration.
+2. **Band-pass 1–15 Hz** (zero-phase Butterworth) keeps wheel impacts and removes gravity, braking and turns.
+3. **Adaptive threshold** = 5 × robust σ, where σ comes from the median absolute deviation (MAD) over a rolling 10 s window. The floor is 0.25 g.
+4. **Grouping**: hits less than 0.5 s apart become one event, so the front and rear wheels count once.
+5. **Classification** uses the sign of the first strong lobe:
+   - **pothole**: the wheel drops first, so the signal goes **negative** (free fall), then spikes positive on impact
+   - **bump**: the wheel is pushed up first, so the signal goes **positive**, then negative
+   - **rough**: the event lasts more than 2 s and crosses zero more than 8 times per second
+6. **Severity** comes from the peak-to-peak size: < 0.5 g low, < 1 g medium, otherwise high. GPS and speed are attached at the peak.
 
-| Variable | Default | Meaning |
-|---|---|---|
-| `RDM_CLUSTER_RADIUS_M` | `5` | merge radius for spatial clustering (metres) |
-| `RDM_DATA_DIR` | `./data` | DB + media root |
-| `RDM_DB_PATH` / `RDM_MEDIA_DIR` | under data dir | override individually |
-| `RDM_MAX_IMAGE_MB` | `8` | upload limit |
-| `RDM_GOOGLE_MAPS_API_KEY` | *(empty)* | Google Maps JavaScript API browser key. Without it the map falls back to OpenStreetMap and shows a notice. |
-| `RDM_SERVICE_AREA` | `37.30,126.10,37.82,126.80` | `min_lat,min_lng,max_lat,max_lng` (Incheon). The map is locked to this box and telemetry outside it is rejected with 422. |
-| `RDM_SERVICE_AREA_NAME` | `Incheon` | label used in messages |
+CSV format: `time,ax,ay,az[,lat,lon,speed]`. Time can be in s or ms. Acceleration is in m/s² (use `--units g` for g). Record at **≥ 50 Hz, ideally 100 Hz**. Phone apps that export this: *Physics Toolbox Sensor Suite*, *phyphox*, *Sensor Logger*.
 
-### Google Maps setup
+Tuning: use a lower `--k` for more sensitivity. Speed changes the amplitude: the same hole feels about 2× stronger at 60 km/h than at 20 km/h. For a fair severity score across a fleet, normalise `peak_to_peak_g` by speed.
 
-1. In Google Cloud Console, enable the **Maps JavaScript API** and create an API key.
-2. Restrict the key to HTTP referrers such as `http://127.0.0.1:8000/*` and `http://localhost:8000/*`.
-3. Start the server with the key:
-   ```powershell
-   $env:RDM_GOOGLE_MAPS_API_KEY = "YOUR_KEY"
-   .venv\Scripts\python -m uvicorn app.main:app --app-dir backend --port 8000
-   ```
-The map uses Google Roadmap, Satellite and Hybrid layers (switcher in the top-right corner) through the Leaflet GoogleMutant plugin. Marker clustering and the heatmap work the same on every layer.
+## 2. Vision algorithm (classical OpenCV, no training data)
 
-## API (`/api/v1`)
+**Cracks**
+1. CLAHE equalises shadows and uneven lighting.
+2. A **black-hat** transform (15 px kernel) keeps thin dark lines and removes the smooth asphalt.
+3. Threshold = median + 5 × MAD of that response, so it adapts to the asphalt's grain.
+4. Each connected piece is skeletonised. It counts as a crack if it is **long** (skeleton ≥ 40 px) and **thin** (area ÷ length ≤ 8 px).
+5. Type:
+   - longitudinal or transverse, from the main direction of the skeleton (the camera is assumed to look along the road)
+   - **alligator**, when the crack pattern encloses ≥ 3 cells (a mesh)
 
-| Method | Path | Notes |
-|---|---|---|
-| POST | `/telemetry` | multipart: `metadata` (JSON) + `image` (file). Also accepts `application/json` with a base64 `image` (data-URI ok). |
-| GET | `/incidents` | `start`, `end` (ISO), `defect_type`, `severity`, `repair_status` (repeat or comma-separate), `sort` (`created_at`, `last_report_at`, `severity`, `repair_status`, `report_count`, `defect_type`), `order` (`asc`/`desc`), `page`, `page_size` |
-| GET | `/incidents/map` | same filters, unpaginated lightweight feed for map layers |
-| GET | `/incidents/{id}` | full incident incl. `images[]` (url, timestamp, device_id) |
-| PATCH | `/incidents/{id}` | `{defect_type?, severity?, repair_status?}` |
-| DELETE | `/incidents/{id}` | deletes incident, its packets and image files |
-| GET | `/stats` | totals and breakdowns |
-| GET | `/events` | Server-Sent Events stream (`incident.created/updated/deleted`) |
+**Potholes**
+1. Local background = a very large median blur. "Darkness" = background − image.
+2. Threshold, then morphological open/close.
+3. A blob is kept only if it is large, solid (≥ 0.6), not line-like (aspect ≤ 4), more textured than the road (this rejects shadows and fresh patches), and ≥ 50 % dark pixels (this rejects closed-up crack meshes).
 
-Telemetry metadata example:
+## 3. Test results (synthetic data)
 
-```json
-{
-  "device_id": "SIM-001",
-  "timestamp": "2026-11-18T07:06:18Z",
-  "location": {"lat": 51.5091, "lng": -0.1350},
-  "sensor_metadata": {"peak_g": 1.12, "rms_g": 0.31, "defect_type_hint": "pothole"}
-}
-```
+- **Sensor**: 4 potholes, 2 speed bumps and 1 gravel stretch, phone tilted 35°/−20°, 4 random seeds. Every event was found and correctly classified, with no false positives.
+- **Vision**: 10 random seeds. All 10 had exactly one pothole, plus the longitudinal, transverse and alligator cracks, with no false positives. In 2 seeds the long crack was reported as 2–3 segments.
 
-## How aggregation works
+This is synthetic data. On real roads, expect to tune `min_dark`, `k_sigma` and `--roi-top`.
 
-1. **Spatial lookup** – the R\*Tree finds candidate incidents in a bounding box around the packet, then an exact haversine check keeps those within `RDM_CLUSTER_RADIUS_M`. Only *unresolved* incidents (`awaiting_repair`, `in_progress`) are merge targets; a defect reported again after `completed` opens a new incident.
-2. **Merge** – the packet is attached (its photo joins the gallery), the incident's coordinates become the centroid of all its packets, `report_count` = number of **unique devices**, `packet_count` = total packets, `created_at` = earliest report, `last_report_at` / `updated_at` = latest.
-3. **Preliminary classification** – severity comes from the max vibration peak (`peak_g`: <0.3 no repair needed, <0.6 low, <1.0 medium, <1.6 high, otherwise critical). Defect type comes from the device's `defect_type_hint`. Once an operator edits severity or type, it is locked and new packets no longer overwrite it.
-4. Ingestion is serialised (lock + `BEGIN IMMEDIATE`), so two devices reporting the same defect at the same moment cannot create duplicate incidents.
+## 4. Limits of classical CV, and the production upgrade
 
-The date range filter applies to `created_at` (first detection).
+Classical CV has trouble with lane markings, tar sealant lines, wet roads, strong shadows and manhole covers. For real deployment, train a detector:
 
-## Frontend
-
-- **Map**: severity- or status-coloured pins (the number on a pin is its device count), clustering until zoom 18 (a cluster takes the colour of its worst member), a toggleable heatmap weighted by severity × log(report frequency), and a legend.
-- **Detail drawer** (click a marker or a row), in the order the spec requires: photo carousel (arrows, thumbnails, swipe) → timestamp (first and latest report, devices, coordinates) → defect type → severity → repair status → **Edit / Save Changes / Delete Incident**.
-- **Hide log**: the "▼ Hide log" button collapses the incident log so the map gets the full height. "▲ Show incident log" brings it back, and the browser remembers the choice.
-- **Log table**: thumbnail, coordinates, date/time, type, severity, status and report count; sortable headers; pagination; multi-criteria filters shared with the map. Clicking a row flies the map to that marker and highlights it.
-- **Updates**: edits and deletes update the UI right away and roll back if the request fails. SSE pushes new packets and changes from other operators to every open browser.
-
-## Simulator
-
-`simulator/simulate.py` builds a street-grid road network with ground-truth defects (pothole, bump, crack). It then drives N virtual vehicles along shared routes, sampling a 100 Hz vertical accelerometer signal. Defect impulses each have their own shape, and the signal includes noise and random false triggers. An edge-side threshold detector picks the events, and a rough waveform classifier produces the type hint. Each packet gets GPS noise and a generated road photo, or one of your own photos via `--images-dir`. When the run ends it prints a clustering summary: packets sent vs. distinct incidents. See `--help` for all options (`--devices`, `--defects`, `--passes`, `--gps-sigma`, `--time-scale`, `--base64`, `--dry-run`, `--center`). The default centre is Incheon City Hall (37.4563, 126.7052).
+- **Dataset**: [RDD2022](https://github.com/sekilab/RoadDamageDetector), about 47k road images from 6 countries. Labels: D00 longitudinal crack, D10 transverse crack, D20 alligator crack, D40 pothole.
+  Also: Kaggle "Pothole Detection" datasets, and CrackForest / DeepCrack for pixel-level crack masks.
+- **Model**: YOLOv8 or YOLO11 (detection) via `ultralytics`:
+  ```
+  pip install ultralytics
+  yolo detect train data=rdd2022.yaml model=yolov8s.pt imgsz=640 epochs=100
+  yolo detect predict model=runs/detect/train/weights/best.pt source=dashcam.mp4
+  ```
+  For crack width and length measurement, use a segmentation model (U-Net, or YOLOv8-seg).
+- **Best system**: fuse both. A camera detection confirmed by an accelerometer event at the same GPS point (within about 10 m) is very unlikely to be a false alarm. Count repeat detections from several vehicles before marking a defect on the map.
