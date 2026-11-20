@@ -421,7 +421,9 @@ def detect_bump_markings(bgr: np.ndarray, road: np.ndarray | None = None, min_bl
         rows_with_road = np.nonzero((road_s > 0).mean(axis=1) > 0.05)[0]
         top = int(rows_with_road[0]) if rows_with_road.size else 0
         road_area = np.zeros((sh, sw), bool)
-        road_area[max(0, top - sh // 50):] = True
+        # A bump across the road cuts the road mask in two (its black rubber is not road
+        # coloured), so the mask stops AT the bump: allow paint a bit above the road's top.
+        road_area[max(0, top - sh // 4):] = True
         road_val = float(np.median(val[road_s > 0])) if (road_s > 0).any() else float(np.median(val))
     else:
         road_s = None
@@ -438,7 +440,7 @@ def detect_bump_markings(bgr: np.ndarray, road: np.ndarray | None = None, min_bl
     for colour in (white, yellow):    # separately, so a white line never pairs with a yellow block
         paint = cv2.morphologyEx(colour.astype(np.uint8) * 255, cv2.MORPH_OPEN, np.ones((3, 3), np.uint8))
         paints.append(paint)
-        found += _bump_rows(paint, s, sh, sw, min_blocks, debug, asphalt)
+        found += _bump_rows(paint, s, sh, sw, min_blocks, debug, asphalt, val, road_val)
     if debug is not None:
         debug["paint"] = cv2.bitwise_or(*paints)
     return _merge_boxes(found)
@@ -468,7 +470,7 @@ def _merge_boxes(defects: list[Defect]) -> list[Defect]:
 
 
 def _bump_rows(paint: np.ndarray, s: float, sh: int, sw: int, min_blocks: int,
-               debug: dict | None, asphalt: np.ndarray) -> list[Defect]:
+               debug: dict | None, asphalt: np.ndarray, val: np.ndarray, road_val: float) -> list[Defect]:
     n, lab, stats, cents = cv2.connectedComponentsWithStats(paint, connectivity=8)
     blobs = []
     for i in range(1, n):
@@ -542,7 +544,8 @@ def _bump_rows(paint: np.ndarray, s: float, sh: int, sw: int, min_blocks: int,
         if angle > 40:                                    # runs along the road: lane dashes
             continue
         areas = np.array([b["area"] for b in bs])
-        if areas.max() / areas.min() > 3.5:               # sizes too uneven
+        steady = np.all(np.diff(areas) > 0) or np.all(np.diff(areas) < 0)   # perspective: shrinks with distance
+        if areas.max() / areas.min() > (5.0 if steady else 3.5):           # sizes too uneven
             continue
         gaps = np.diff(xs)
         if len(gaps) >= 2 and gaps.std() / gaps.mean() > 0.6:   # irregular spacing
@@ -554,7 +557,9 @@ def _bump_rows(paint: np.ndarray, s: float, sh: int, sw: int, min_blocks: int,
         elongated = [b for b in bs if b["aspect"] > 1.8 and not b["triangle"]]
         if elongated:
             off = [min(abs(b["axis"] - row_dir), 180 - abs(b["axis"] - row_dir)) for b in elongated]
-            if np.median(off) < 30:
+            # ...unless the gaps between the blocks are much darker than the paint: that is the
+            # paint / black rubber striping of a rubber speed bump seen from the side
+            if np.median(off) < 30 and not _dark_gaps(bs, lab, val, road_val, debug):
                 continue
         x0 = min(b["x"] for b in bs); y0 = min(b["y"] for b in bs)
         x1 = max(b["x"] + b["w"] for b in bs); y1 = max(b["y"] + b["h"] for b in bs)
@@ -567,6 +572,24 @@ def _bump_rows(paint: np.ndarray, s: float, sh: int, sw: int, min_blocks: int,
         score = round(min(0.95, 0.45 + 0.08 * len(bs) + 0.25 * regular), 3)
         found.append(Defect("speed_bump", box, area_px=box[2] * box[3], severity="info", confidence=score))
     return found
+
+
+def _dark_gaps(bs: list[dict], lab: np.ndarray, val: np.ndarray, road_val: float, debug: dict | None) -> bool:
+    """True when the stretch between each pair of neighbouring blocks is much darker than both
+    the blocks and the asphalt (yellow/black rubber bump), not plain asphalt (a broken line)."""
+    paint_v = np.median([np.median(val[lab == b["i"]]) for b in bs])
+    gap_vs = []
+    for a, b in zip(bs, bs[1:]):
+        n = max(2, int(np.hypot(b["cx"] - a["cx"], b["cy"] - a["cy"])))
+        xs = np.linspace(a["cx"], b["cx"], n).astype(int)
+        ys = np.linspace(a["cy"], b["cy"], n).astype(int)
+        between = lab[ys, xs] == 0                    # off both blocks
+        if between.sum() < 3:
+            return False
+        gap_vs.append(float(np.median(val[ys, xs][between])))
+    if debug is not None:
+        debug.setdefault("gaps", []).append((float(paint_v), gap_vs))
+    return max(gap_vs) < min(0.6 * paint_v, road_val - 30)
 
 
 def detect_potholes_model(bgr: np.ndarray, model, conf: float = 0.5) -> tuple[list[Defect], np.ndarray]:

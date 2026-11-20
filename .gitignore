@@ -15,3 +15,8 @@ test_images/results/
 demo_trip.png
 # your own test photos: often web images of unknown copyright, so kept out of the public repo
 test_images/user/
+
+# test bench photos (test_environment/server.py)
+test_environment/captures/
+# session handoff notes (Pi address, setup details)
+HANDOFF.md

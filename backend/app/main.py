@@ -241,7 +241,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         bus.publish("incident.updated", {"id": incident_id})
         return incident
 
-    @api.delete("/incidents/{incident_id}", status_code=204)
+    # response_model=None: older FastAPI (0.115, Debian's) reads "-> None" as a response body
+    # and refuses it with a 204 status
+    @api.delete("/incidents/{incident_id}", status_code=204, response_model=None)
     async def delete_incident(incident_id: str) -> None:
         paths = db.delete_incident(incident_id)
         if paths is None:

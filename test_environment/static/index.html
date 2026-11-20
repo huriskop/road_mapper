@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Equipment Check</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header>
+    <h1>Road monitor · test bench</h1>
+    <nav>
+      <a href="/" class="active">Equipment check</a>
+      <a href="/capture">Auto capture</a>
+    </nav>
+    <span class="spacer"></span>
+    <span id="link" class="badge">connecting</span>
+  </header>
+
+  <main class="grid check">
+    <section class="panel cam">
+      <div class="head">
+        <h2>Camera</h2>
+        <span id="camBadge" class="badge">…</span>
+        <span id="camInfo" class="meta"></span>
+      </div>
+      <div class="body">
+        <div class="camview"><img id="camImg" alt="Live camera view" /><div class="flash"></div></div>
+        <div id="camError" class="error"></div>
+        <div class="row">
+          <button id="snapBtn" class="primary">Take test photo</button>
+          <img id="snapPreview" class="snap-preview" alt="Last test photo" />
+          <a id="snapLink" class="meta" target="_blank"></a>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel imu">
+      <div class="head">
+        <h2>MPU-6050</h2>
+        <span id="imuBadge" class="badge">…</span>
+        <button id="zeroBtn" class="meta" title="Set yaw to 0 and re-measure gyro bias (keep the sensor still)">Reset yaw</button>
+      </div>
+      <div class="body">
+        <div class="sphere-wrap">
+          <canvas id="sphere" aria-label="Sensor orientation"></canvas>
+          <div id="calib" class="calib" hidden>calibrating gyro — keep the sensor still</div>
+        </div>
+        <div class="readout">
+          <div class="angles">
+            <div class="angle"><span>roll</span><b id="roll">—</b></div>
+            <div class="angle"><span>pitch</span><b id="pitch">—</b></div>
+            <div class="angle"><span>yaw</span><b id="yaw">—</b></div>
+          </div>
+          <dl class="kv">
+            <dt>accel x y z</dt><dd id="accel">—</dd>
+            <dt>gyro x y z</dt><dd id="gyro">—</dd>
+            <dt>temperature</dt><dd id="temp">—</dd>
+          </dl>
+          <div class="dyn-label"><span>vertical accel (gravity removed)</span><b id="dynNow">—</b></div>
+          <div class="dyn-wrap"><canvas id="dynChart"></canvas></div>
+          <div id="imuError" class="error"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel gps">
+      <div class="head">
+        <h2>GPS</h2>
+        <span id="gpsBadge" class="badge">…</span>
+        <span id="gpsStatus" class="meta gps-status"></span>
+      </div>
+      <div class="body">
+        <div class="fields">
+          <dl class="kv">
+            <dt>latitude</dt><dd id="lat">—</dd>
+            <dt>longitude</dt><dd id="lng">—</dd>
+            <dt>altitude</dt><dd id="alt">—</dd>
+            <dt>satellites</dt><dd id="sats">—</dd>
+            <dt>HDOP</dt><dd id="hdop">—</dd>
+            <dt>speed</dt><dd id="speed">—</dd>
+            <dt>course</dt><dd id="course">—</dd>
+            <dt>UTC</dt><dd id="utc">—</dd>
+          </dl>
+          <div id="gpsError" class="error"></div>
+          <div id="nmea" class="nmea"></div>
+        </div>
+        <div class="trail-wrap"><canvas id="trail" aria-label="GPS track"></canvas></div>
+      </div>
+    </section>
+  </main>
+
+  <script src="/static/common.js"></script>
+  <script>
+    Bench.start();
+    const { $, post } = Bench;
+    let snapId = null;
+
+    // show what the camera detector found in the test photo once it is done
+    function showSnap(item) {
+      const src = item.annotated || item.image;
+      $("snapPreview").src = src;
+      $("snapPreview").style.display = "block";
+      $("snapLink").href = src;
+      const a = item.analysis || {};
+      const found = [a.potholes && `${a.potholes} pothole(s)`, a.speed_bumps && `${a.speed_bumps} speed bump(s)`,
+                     a.cracks && `${a.cracks} crack(s)`].filter(Boolean).join(", ");
+      $("snapLink").textContent =
+        a.status === "done" ? `detector: ${found || "nothing found"} (${(a.time_ms / 1000).toFixed(1)} s) — open labelled photo`
+        : a.status === "skipped" || a.status === "error" ? `saved; not analyzed: ${a.message}`
+        : "saved; detector analyzing…";
+    }
+    Bench.on("capture", (item) => { if (item.id === snapId) showSnap(item); });
+
+    $("snapBtn").addEventListener("click", async () => {
+      $("snapBtn").disabled = true;
+      try {
+        const item = await post("/api/snapshot");
+        if (item.image) {
+          snapId = item.id;
+          showSnap(item);
+        } else {
+          $("snapLink").textContent = "no frame from the camera yet";
+        }
+      } catch (err) {
+        $("snapLink").textContent = "failed: " + err.message;
+      } finally {
+        $("snapBtn").disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

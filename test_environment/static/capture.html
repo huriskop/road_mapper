@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Auto Capture</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header>
+    <h1>Road monitor · test bench</h1>
+    <nav>
+      <a href="/">Equipment check</a>
+      <a href="/capture" class="active">Auto capture</a>
+    </nav>
+    <span class="spacer"></span>
+    <span id="link" class="badge">connecting</span>
+  </header>
+
+  <main class="grid capture">
+    <section class="panel cam">
+      <div class="head">
+        <h2>Camera</h2>
+        <span id="camBadge" class="badge">…</span>
+        <span id="camInfo" class="meta"></span>
+      </div>
+      <div class="body">
+        <div class="camview"><img id="camImg" alt="Live camera view" /><div class="flash"></div></div>
+        <div id="camError" class="error"></div>
+      </div>
+    </section>
+
+    <section class="panel imu">
+      <div class="head">
+        <h2>MPU-6050</h2>
+        <span id="imuBadge" class="badge">…</span>
+        <button id="zeroBtn" class="meta" title="Set yaw to 0 and re-measure gyro bias (keep the sensor still)">Reset yaw</button>
+      </div>
+      <div class="body">
+        <div class="sphere-wrap">
+          <canvas id="sphere" aria-label="Sensor orientation"></canvas>
+          <div id="calib" class="calib" hidden>calibrating gyro — keep the sensor still</div>
+        </div>
+        <div class="readout">
+          <div class="angles">
+            <div class="angle"><span>roll</span><b id="roll">—</b></div>
+            <div class="angle"><span>pitch</span><b id="pitch">—</b></div>
+            <div class="angle"><span>yaw</span><b id="yaw">—</b></div>
+          </div>
+          <div class="dyn-label"><span>vertical accel</span><b id="dynNow">—</b></div>
+          <div class="dyn-wrap"><canvas id="dynChart"></canvas></div>
+          <div id="imuError" class="error"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel gps">
+      <div class="head">
+        <h2>GPS</h2>
+        <span id="gpsBadge" class="badge">…</span>
+        <span id="gpsStatus" class="meta gps-status"></span>
+      </div>
+      <div class="body">
+        <div class="fields">
+          <dl class="kv">
+            <dt>latitude</dt><dd id="lat">—</dd>
+            <dt>longitude</dt><dd id="lng">—</dd>
+            <dt>satellites</dt><dd id="sats">—</dd>
+            <dt>speed</dt><dd id="speed">—</dd>
+          </dl>
+          <div id="gpsError" class="error"></div>
+        </div>
+        <div class="trail-wrap"><canvas id="trail" aria-label="GPS track"></canvas></div>
+      </div>
+    </section>
+
+    <section class="panel log">
+      <div class="head">
+        <h2>Capture log</h2>
+        <span id="count" class="badge">0</span>
+        <button id="clearBtn" class="meta" title="Clear this list (photos stay on the Pi)">Clear</button>
+      </div>
+      <div class="body">
+        <div class="controls">
+          <label>
+            <input id="enabled" type="checkbox" checked /> auto photo when the sensor jolts up or down
+          </label>
+          <label>
+            threshold
+            <input id="threshold" type="range" min="0.1" max="2" step="0.05" value="0.4" />
+            <output id="thresholdOut">0.40 g</output>
+          </label>
+          <div class="row">
+            <span class="meta">camera detector</span>
+            <span id="detBadge" class="badge">…</span>
+            <span id="detInfo" class="meta"></span>
+          </div>
+          <div id="simRow" class="row" hidden>
+            <span class="meta">simulator:</span>
+            <button data-sim="pothole">▼ pothole (drop)</button>
+            <button data-sim="bump">▲ bump (lift)</button>
+          </div>
+        </div>
+        <ul id="log" class="loglist"></ul>
+        <div id="empty" class="empty">No photos yet. Jolt the sensor up or down past the threshold.</div>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="viewer" class="viewer"><img id="viewerImg" alt="Captured photo" /></dialog>
+
+  <script src="/static/common.js"></script>
+  <script>
+    const { $, post, fmt } = Bench;
+    const LABEL = { down: "▼ DOWN", up: "▲ UP", manual: "● MANUAL" };
+    const SENSOR_SAYS = { down: "pothole", up: "speed_bump" };
+    const VERDICT = { pothole: "POTHOLE", speed_bump: "SPEED BUMP", crack: "CRACKS", none: "nothing found" };
+    const rows = new Map();               // id -> <li>, so detector results update the same entry
+
+    const pct = (c) => (c === null || c === undefined ? "" : ` ${Math.round(c * 100)}%`);
+
+    function cameraLine(item) {
+      const a = item.analysis;
+      if (!a) return ["pending", "camera: waiting…"];
+      if (a.status === "queued") return ["pending", "camera: queued…"];
+      if (a.status === "running") return ["pending", "camera: analyzing…"];
+      if (a.status === "skipped") return ["muted", "camera: not analyzed (" + a.message + ")"];
+      if (a.status === "error") return ["bad", "camera: detector error (" + a.message + ")"];
+      const parts = [];
+      if (a.potholes) parts.push(`${a.potholes} pothole${a.potholes > 1 ? "s" : ""}${pct(a.pothole_confidence)}`);
+      if (a.speed_bumps) parts.push(`${a.speed_bumps} speed bump${a.speed_bumps > 1 ? "s" : ""}${pct(a.speed_bump_confidence)}`);
+      if (a.cracks) parts.push(`${a.cracks} crack${a.cracks > 1 ? "s" : ""}`);
+      return [a.verdict, "camera: " + (parts.join(" · ") || "nothing found") + ` · ${(a.time_ms / 1000).toFixed(1)} s`];
+    }
+
+    function agreement(item) {
+      const a = item.analysis, expected = SENSOR_SAYS[item.reason];
+      if (!a || a.status !== "done" || !expected) return null;
+      return a.verdict === expected ? ["ok", "✓ camera agrees with the sensor"] : ["bad", "✗ camera does not confirm the sensor"];
+    }
+
+    function render(li, item) {
+      li.replaceChildren();
+      const img = document.createElement("img");
+      const src = item.annotated || item.image;
+      img.alt = item.reason + " photo";
+      if (src) {
+        img.src = src;
+        img.title = item.annotated ? "labelled by the detector" : "original photo";
+        img.addEventListener("click", () => { $("viewerImg").src = src; $("viewer").showModal(); });
+      }
+      const info = document.createElement("div");
+      info.className = "info";
+      const line = (cls, text) => { const s = document.createElement("span"); s.className = cls; s.textContent = text; info.append(s); return s; };
+
+      const head = line("", "");
+      const dir = document.createElement("span");
+      dir.className = "dir " + item.reason;
+      dir.textContent = LABEL[item.reason] || item.reason;
+      head.append(dir, item.peak_g !== null ? ` peak ${Math.abs(item.peak_g).toFixed(2)} g · sensor: ${item.guess}` : "");
+
+      const [cls, text] = cameraLine(item);
+      const cam = line("camres " + cls, text);
+      if (item.analysis?.status === "done") {
+        const chip = document.createElement("b");
+        chip.className = "chip " + item.analysis.verdict;
+        chip.textContent = VERDICT[item.analysis.verdict];
+        cam.prepend(chip, " ");
+      }
+      const agree = agreement(item);
+      if (agree) line("agree " + agree[0], agree[1]);
+
+      const time = new Date(item.time).toLocaleTimeString([], { hour12: false }) + "." + item.time.slice(20, 23);
+      line("t", `#${item.id} · ${time}`);
+      const where = item.lat !== null && item.lat !== undefined
+        ? `${fmt(item.lat, 6)}, ${fmt(item.lng, 6)}${item.gps_fix ? "" : " (no fix)"}` : "no GPS position";
+      line("", where + (item.speed_kmh !== null && item.speed_kmh !== undefined ? ` · ${item.speed_kmh} km/h` : ""));
+      li.append(img, info);
+    }
+
+    function upsert(item) {
+      let li = rows.get(item.id);
+      if (!li) {
+        li = document.createElement("li");
+        rows.set(item.id, li);
+        $("log").prepend(li);
+        $("count").textContent = rows.size;
+        $("empty").hidden = true;
+      }
+      if (Number(li.dataset.seq || 0) > item.seq) return;      // history fetch can be older than the stream
+      li.dataset.seq = item.seq;
+      render(li, item);
+    }
+
+    // controls + detector status
+    let lastTrigger = null;
+    Bench.on("state", (s) => {
+      $("simRow").hidden = s.imu.source !== "sim";
+      const d = s.detector;
+      const [cls, text] = !d.available ? ["bad", "off"] : !d.ready ? ["sim", "loading models"] : ["ok", "ready"];
+      $("detBadge").className = "badge " + cls;
+      $("detBadge").textContent = text;
+      $("detBadge").title = d.error || "";
+      const models = d.models ? Object.entries(d.models).filter(([, v]) => v).map(([k]) => k.replace("_", " ")) : [];
+      $("detInfo").textContent = !d.available ? (d.error || "")
+        : [d.detect.join(", "), models.length ? "models: " + models.join(", ") : "no model files (rules only)",
+           d.queued ? `${d.queued} waiting` : "", d.last_ms ? `last ${(d.last_ms / 1000).toFixed(1)} s` : ""]
+          .filter(Boolean).join(" · ");
+
+      const t = s.trigger;
+      if (JSON.stringify(t) === lastTrigger) return;             // only sync when the server's values change
+      lastTrigger = JSON.stringify(t);
+      if (document.activeElement !== $("threshold")) $("threshold").value = t.threshold_g;
+      $("thresholdOut").textContent = t.threshold_g.toFixed(2) + " g";
+      $("enabled").checked = t.enabled;
+    });
+    $("threshold").addEventListener("input", () => { $("thresholdOut").textContent = Number($("threshold").value).toFixed(2) + " g"; });
+    $("threshold").addEventListener("change", () => post("/api/trigger", { threshold_g: Number($("threshold").value) }));
+    $("enabled").addEventListener("change", () => post("/api/trigger", { enabled: $("enabled").checked }));
+    document.querySelectorAll("[data-sim]").forEach((b) =>
+      b.addEventListener("click", () => post("/api/simulate", { kind: b.dataset.sim }).catch((e) => alert(e.message))));
+    $("clearBtn").addEventListener("click", () => {
+      $("log").replaceChildren(); rows.clear(); $("count").textContent = 0; $("empty").hidden = false;
+    });
+    $("viewer").addEventListener("click", () => $("viewer").close());
+
+    Bench.on("capture", upsert);
+    fetch("/api/captures").then((r) => r.json()).then((d) => d.items.forEach(upsert)).catch(() => {});
+    Bench.start();
+  </script>
+</body>
+</html>
