@@ -105,7 +105,7 @@ main.capture {
   border: 1px solid var(--line);
 }
 .badge.ok { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 40%, transparent); }
-.badge.sim { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 40%, transparent); }
+.badge.wait { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 40%, transparent); }
 .badge.bad { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 40%, transparent); }
 
 button, .btn {
@@ -255,3 +255,5 @@ dialog.viewer img { max-width: 95vw; max-height: 90vh; display: block; border-ra
   .trail-wrap { flex: none; height: 180px; }
   .log { min-height: 420px; }
 }
+
+.loglist a { color: var(--accent); }

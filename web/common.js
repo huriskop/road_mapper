@@ -22,8 +22,7 @@ const Bench = (() => {
   function setBadge(el, dev, realName) {
     if (!el) return;
     let cls = "ok", text = realName;
-    if (dev.source === "sim") { cls = "sim"; text = "simulated"; }
-    else if (!dev.ok) { cls = "bad"; text = "error"; }
+    if (!dev.ok) { cls = "bad"; text = "error"; }
     el.className = "badge " + cls;
     el.textContent = text;
   }
@@ -44,20 +43,13 @@ const Bench = (() => {
 
   // ------------------------------------------------------------------ camera
   let camStarted = false;
-  function startCamera(info) {
+  function startCamera() {
     const img = $("camImg");
     if (!img || camStarted) return;
     camStarted = true;
-    if (info.mime === "image/jpeg") {             // real camera: MJPEG stream
-      const load = () => { img.src = "/api/camera.mjpg?" + Date.now(); };
-      img.onerror = () => setTimeout(load, 2000);
-      load();
-    } else {                                       // simulator: poll single frames
-      const tick = () => { img.src = "/api/frame?" + Date.now(); };
-      img.onload = () => setTimeout(tick, 150);
-      img.onerror = () => setTimeout(tick, 1500);
-      tick();
-    }
+    const load = () => { img.src = "/api/camera.mjpg?" + Date.now(); };
+    img.onerror = () => setTimeout(load, 2000);
+    load();
   }
   function flashCamera() {
     const f = document.querySelector(".camview .flash");
@@ -230,8 +222,8 @@ const Bench = (() => {
   function render(s) {
     const cam = s.camera, imu = s.imu, gps = s.gps;
 
-    startCamera(cam);
-    setBadge($("camBadge"), cam, cam.source);
+    startCamera();
+    setBadge($("camBadge"), cam, "Pi camera");
     setText("camInfo", `${cam.size[0]}×${cam.size[1]} · ${cam.fps.toFixed(1)} fps`);
     setText("camError", cam.error || "");
 
@@ -252,7 +244,7 @@ const Bench = (() => {
 
     const gb = $("gpsBadge");
     if (gb) {
-      const [cls, text] = gps.source === "sim" ? ["sim", "simulated"] : gps.fix ? ["ok", "fix"] : ["bad", "no fix"];
+      const [cls, text] = gps.fix ? ["ok", "fix"] : ["bad", "no fix"];
       gb.className = "badge " + cls;
       gb.textContent = text;
     }

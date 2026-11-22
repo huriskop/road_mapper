@@ -6,7 +6,7 @@
   <title>Road Defect Monitor</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
-  <link rel="stylesheet" href="/static/styles.css" />
+  <link rel="stylesheet" href="/web/map.css" />
 </head>
 <body>
   <header class="topbar">
@@ -14,7 +14,7 @@
       <span class="logo" aria-hidden="true"></span>
       <h1>Road Defect Monitor</h1>
     </div>
-    <a class="btn" href="/test" style="text-decoration:none">Test a photo</a>
+    <nav class="pages"><a href="/">Equipment check</a><a href="/capture">Auto capture</a><a href="/map" class="active">Map</a><a href="/test">Test a photo</a></nav>
     <div class="stats" id="stats"></div>
     <div class="live" id="live-indicator" title="Live updates"><span class="dot"></span><span class="label">connecting…</span></div>
   </header>
@@ -109,7 +109,6 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
   <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
-  <script src="https://unpkg.com/leaflet.gridlayer.googlemutant@0.16.0/dist/Leaflet.GoogleMutant.js"></script>
-  <script src="/static/app.js"></script>
+  <script src="/web/map.js"></script>
 </body>
 </html>

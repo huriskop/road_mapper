@@ -12,9 +12,9 @@ The files are too big for git, so they are not committed.
 
 ## Download
 
-```powershell
-curl.exe -L -o models/pothole_1class.onnx https://huggingface.co/peterhdd/pothole-detection-yolov8/resolve/main/best.onnx
-curl.exe -L -o models/road_anomaly_7class.onnx https://huggingface.co/Logesshhh/road-anomaly-pothole-yolov8m/resolve/main/pothole_yolov8.onnx
+```bash
+curl -L -o models/pothole_1class.onnx https://huggingface.co/peterhdd/pothole-detection-yolov8/resolve/main/best.onnx
+curl -L -o models/road_anomaly_7class.onnx https://huggingface.co/Logesshhh/road-anomaly-pothole-yolov8m/resolve/main/pothole_yolov8.onnx
 ```
 
 SHA-256:

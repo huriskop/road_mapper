@@ -1,22 +1,17 @@
 __pycache__/
 *.pyc
-venv/
 .venv/
-*.mp4
-events.json
-defects.json
+.pytest_cache/
 
-# large model weights (see models/README.md) and local run data
-models/*.onnx
-data_real/
-
+# photos and map data
 data/
+# large model weights (see models/README.md)
+models/*.onnx
 test_images/results/
-demo_trip.png
-# your own test photos: often web images of unknown copyright, so kept out of the public repo
 test_images/user/
 
-# test bench photos (test_environment/server.py)
-test_environment/captures/
-# session handoff notes (Pi address, setup details)
+# session handoff notes, local settings, generated files
 HANDOFF.md
+.claude/
+graphify-out/
+.vscode/

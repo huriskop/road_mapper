@@ -80,7 +80,7 @@
 <body>
   <header>
     <h1>Test a Photo</h1>
-    <a href="/">← Back to the map</a>
+    <a href="/">Equipment check</a><a href="/capture">Auto capture</a><a href="/map">Map</a>
     <span id="model-status" class="hint"></span>
   </header>
 
@@ -88,7 +88,7 @@
     <section class="controls" aria-label="Choose photos">
       <div class="drop" id="drop" tabindex="0" role="button" aria-label="Choose road photos to test">
         <strong>Drop road photos here, or click to choose</strong>
-        <span>JPEG, PNG or WebP · several at once is fine · nothing is saved to the map</span>
+        <span>JPEG, PNG or WebP · several at once is fine · nothing is saved unless you add it to the map</span>
       </div>
       <input type="file" id="file" accept="image/jpeg,image/png,image/webp" multiple hidden />
       <div class="opts">
@@ -108,7 +108,7 @@
           <button class="btn" type="button" id="clear" disabled>Clear results</button>
         </div>
       </div>
-      <p class="hint">Lower the cut-off to catch more potholes (and more false alarms); raise it to keep only confident ones. Speed bumps use a fixed 50% cut-off. Speed bumps add about half a second per photo.</p>
+      <p class="hint">Lower the cut-off to catch more potholes (and more false alarms); raise it to keep only confident ones. Speed bumps use a fixed 50% cut-off. On the Pi one photo takes several seconds.</p>
     </section>
 
     <section class="results" id="results" aria-live="polite"></section>
@@ -156,14 +156,10 @@
       card.append(head, body);
       $("results").prepend(card);
 
-      const fd = new FormData();
-      fd.append("image", file);
-      fd.append("detect", s.detect.join(","));
-      fd.append("conf", s.conf);
       try {
-        const res = await fetch("/api/v1/analyze", { method: "POST", body: fd });
+        const res = await fetch("/api/photo?" + new URLSearchParams({ detect: s.detect.join(","), conf: s.conf }), { method: "POST", body: file });
         const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.detail || `server answered ${res.status}`);
+        if (!res.ok) throw new Error(data.error || `the Pi answered ${res.status}`);
         render(card, head, body, file, data);
       } catch (err) {
         head.querySelector(".meta").textContent = "failed";
@@ -172,8 +168,8 @@
     }
 
     function render(card, head, placeholder, file, data) {
-      if (!data.pothole_model) {
-        $("model-status").textContent = "Pothole model file missing on the server (models/pothole_1class.onnx): using the older image rules for potholes. See models/README.md.";
+      if (!data.models.pothole) {
+        $("model-status").textContent = "Pothole model file missing on the Pi (models/pothole_1class.onnx): using the older image rules for potholes. See models/README.md.";
         $("model-status").classList.add("warn");
       }
       const pot = data.defects.filter(d => d.kind === "pothole");
@@ -191,8 +187,8 @@
       if (data.detect.includes("crack")) parts.push(crk.length ? plural(crk.length, "crack", "cracks") : "no cracks");
       if (data.detect.includes("speed_bump")) parts.push(bmp.length ? plural(bmp.length, "speed bump", "speed bumps") : "no speed bumps");
       found.append(el("div", { class: "verdict " + (pot.length || crk.length ? "yes" : "no"), text: parts.join(", ") }));
-      if (data.detect.includes("speed_bump") && !data.speed_bump_model) {
-        found.append(el("p", { class: "hint", text: "Speed bump model is not installed on the server (models/road_anomaly_7class.onnx)." }));
+      if (data.detect.includes("speed_bump") && !data.models.speed_bump) {
+        found.append(el("p", { class: "hint", text: "Speed bump model is not installed on the Pi (models/road_anomaly_7class.onnx)." }));
       }
 
       if (data.defects.length) {
@@ -208,7 +204,7 @@
         found.append(el("p", { class: "empty", text: "Nothing above the cut-off. Try a lower cut-off if you expected something." }));
       }
 
-      found.append(reportForm(file, data));
+      found.append(reportForm(file));
       const bodyEl = el("div", { class: "card-body" },
         el("figure", {}, original, el("figcaption", { text: "Original" })),
         el("figure", {}, labelled, el("figcaption", { text: "Detector" })),
@@ -216,25 +212,15 @@
       placeholder.replaceWith(bodyEl);
     }
 
-    // ---- "Add to map": send the photo as a report, exactly like a vehicle would
-    let AREA = null;
-    fetch("/api/v1/config").then((r) => r.json()).then((c) => (AREA = c.service_area)).catch(() => {});
+    // ---- "Add to map"
     let formSeq = 0;
 
-    function exifTime(s) {        // "2024:05:01 14:03:22" -> ISO, or now
-      const m = /^(\d{4}):(\d{2}):(\d{2})[ T](\d{2}):(\d{2}):(\d{2})/.exec(s || "");
-      return m ? new Date(`${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6]}`).toISOString() : new Date().toISOString();
-    }
-
-    function reportForm(file, data) {
+    function reportForm(file) {
       const n = ++formSeq;
       const wrap = el("form", { class: "report", novalidate: "" });
       const lat = el("input", { id: `lat-${n}`, type: "number", step: "any", placeholder: "37.4563", required: "" });
       const lng = el("input", { id: `lng-${n}`, type: "number", step: "any", placeholder: "126.7052", required: "" });
-      if (data.gps) { lat.value = data.gps.lat; lng.value = data.gps.lng; }
-      const msg = el("p", { class: "hint", text: data.gps
-        ? "Location read from the photo's GPS data."
-        : "This photo has no GPS data. Enter where it was taken." });
+      const msg = el("p", { class: "hint", text: "Enter where the photo was taken. The detector runs once more." });
       const btn = el("button", { class: "btn primary", type: "submit", text: "Add to map" });
       wrap.append(
         el("div", { class: "report-title", text: "Report this photo on the map" }),
@@ -247,27 +233,15 @@
         e.preventDefault();
         const la = parseFloat(lat.value), ln = parseFloat(lng.value);
         if (!isFinite(la) || !isFinite(ln)) { msg.textContent = "Enter a latitude and a longitude."; msg.className = "hint warn"; return; }
-        if (AREA && (la < AREA.south || la > AREA.north || ln < AREA.west || ln > AREA.east)) {
-          msg.textContent = `That point is outside the ${AREA.name} service area (lat ${AREA.south}–${AREA.north}, lng ${AREA.west}–${AREA.east}).`;
-          msg.className = "hint warn"; return;
-        }
         btn.disabled = true; btn.textContent = "Adding…";
-        const meta = {
-          device_id: "CONSOLE-UPLOAD",
-          timestamp: exifTime(data.gps && data.gps.taken),
-          location: { lat: la, lng: ln },
-          sensor_metadata: { source: "console_upload", file_name: file.name },
-        };
-        const fd = new FormData();
-        fd.append("metadata", JSON.stringify(meta));
-        fd.append("image", file);
+        const s = settings();
         try {
-          const res = await fetch("/api/v1/telemetry", { method: "POST", body: fd });
+          const res = await fetch("/api/photo?" + new URLSearchParams({ detect: s.detect.join(","), conf: s.conf, lat: la, lng: ln }), { method: "POST", body: file });
           const out = await res.json().catch(() => ({}));
-          if (!res.ok) throw new Error(out.detail ? JSON.stringify(out.detail) : `server answered ${res.status}`);
+          if (!res.ok) throw new Error(out.error || `the Pi answered ${res.status}`);
           wrap.replaceChildren(
-            el("div", { class: "report-title", text: out.incident_created ? "Added to the map as a new incident" : "Added to an existing incident nearby" }),
-            el("a", { class: "btn primary", href: `/#incident-${out.incident_id}`, text: "Open on the map →" }));
+            el("div", { class: "report-title", text: out.incident.report_count === 1 ? "Added to the map as a new incident" : "Added to an existing incident nearby" }),
+            el("a", { class: "btn primary", href: `/map#incident-${out.incident.id}`, text: "Open on the map →" }));
         } catch (err) {
           btn.disabled = false; btn.textContent = "Add to map";
           msg.textContent = "Could not add it: " + err.message; msg.className = "hint warn";
@@ -279,7 +253,7 @@
     async function runAll(list) {
       if (!list.length) return;
       $("rerun").disabled = $("clear").disabled = false;
-      for (const f of list) await analyze(f);   // one at a time keeps the server responsive
+      for (const f of list) await analyze(f);   // one at a time keeps the Pi responsive
     }
 
     function addFiles(list) {
@@ -301,10 +275,10 @@
     $("clear").addEventListener("click", () => { files = []; $("results").replaceChildren(); $("rerun").disabled = $("clear").disabled = true; });
     $("zoom").addEventListener("click", () => $("zoom").close());
 
-    fetch("/api/v1/stats").then(() => {
+    fetch("/api/state").then(() => {
       $("model-status").textContent = "Potholes and speed bumps: trained YOLOv8 models. Cracks: image rules.";
     }).catch(() => {
-      $("model-status").textContent = "The server is not reachable. Start it, then reload this page.";
+      $("model-status").textContent = "run.py is not reachable. Start it on the Pi, then reload this page.";
       $("model-status").classList.add("warn");
     });
   </script>

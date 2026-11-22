@@ -1,8 +1,7 @@
-/* Road Defect Monitor – map, marker drawer and dashboard log. */
+/* Map page: pins, heatmap, filters, incident log and details. All incidents are loaded at once from
+   /api/incidents; filtering and sorting happen here in the browser. */
 (() => {
   "use strict";
-
-  const API = "/api/v1";
 
   const ENUMS = {
     defect_type: ["pothole", "bump", "crack", "unclassified"],
@@ -26,11 +25,12 @@
     sort: { field: "created_at", order: "desc" },
     page: 1,
     pageSize: 20,
-    pages: 1,
-    mapItems: new Map(), // id -> lightweight incident
+    rev: 0,
+    all: [],             // every incident
+    mapItems: new Map(), // id -> incident, after filters
     rows: [],            // current page of the log table
     selectedId: null,
-    current: null,       // full incident shown in drawer
+    current: null,       // incident shown in drawer
     editing: false,
     colorBy: "severity",
     pendingOps: 0,
@@ -59,91 +59,25 @@
   }
 
   async function api(path, opts = {}) {
-    const res = await fetch(API + path, { headers: { "Content-Type": "application/json" }, ...opts });
-    if (!res.ok) {
-      let detail = res.statusText;
-      try { detail = (await res.json()).detail || detail; } catch { /* ignore */ }
-      throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
-    }
-    return res.status === 204 ? null : res.json();
+    const res = await fetch("/api" + path, { headers: { "Content-Type": "application/json" }, ...opts });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || res.statusText);
+    return data;
   }
 
-  function filterQuery() {
-    const q = new URLSearchParams();
-    const f = state.filters;
-    if (f.start) q.set("start", new Date(f.start).toISOString());
-    if (f.end) q.set("end", new Date(f.end).toISOString());
-    for (const key of ["defect_type", "severity", "repair_status"]) for (const v of f[key]) q.append(key, v);
-    return q;
+  function matches(i) {
+    const f = state.filters, t = Date.parse(i.created_at);
+    if (f.start && t < new Date(f.start).getTime()) return false;
+    if (f.end && t > new Date(f.end).getTime()) return false;
+    return ["defect_type", "severity", "repair_status"].every((k) => !f[k].size || f[k].has(i[k]));
   }
 
   // -------------------------------------------------------------------- map
-  // Default service area (Incheon); replaced by /api/v1/config on startup.
-  let serviceBounds = L.latLngBounds([37.30, 126.10], [37.82, 126.80]);
-  const map = L.map("map", { zoomControl: true, maxBoundsViscosity: 1.0, maxZoom: 20 })
-    .fitBounds(serviceBounds);
-
-  function mapNotice(html) {
-    const el = document.createElement("div");
-    el.className = "map-notice";
-    el.innerHTML = html;
-    $(".map-wrap").appendChild(el);
-  }
-
-  function loadGoogleMaps(key) {
-    return new Promise((resolve, reject) => {
-      if (window.google?.maps) return resolve();
-      const timer = setTimeout(() => reject(new Error("timed out loading Google Maps")), 15000);
-      window.__rdmGoogleReady = () => { clearTimeout(timer); resolve(); };
-      window.gm_authFailure = () => { // invalid / unauthorised key
-        mapNotice("Google Maps rejected the API key – check <code>RDM_GOOGLE_MAPS_API_KEY</code> and its referrer restrictions.");
-      };
-      const s = document.createElement("script");
-      s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&loading=async&language=en&region=KR&callback=__rdmGoogleReady`;
-      s.async = true;
-      s.onerror = () => { clearTimeout(timer); reject(new Error("could not load Google Maps")); };
-      document.head.appendChild(s);
-    });
-  }
-
-  function useFallbackTiles(reason) {
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: 20, maxNativeZoom: 19,
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-    }).addTo(map);
-    mapNotice(`${esc(reason)} Showing OpenStreetMap instead.`);
-  }
-
-  async function setupBaseMap() {
-    let cfg = { google_maps_api_key: "" };
-    try {
-      cfg = await api("/config");
-      const a = cfg.service_area;
-      serviceBounds = L.latLngBounds([a.south, a.west], [a.north, a.east]);
-    } catch { /* keep defaults */ }
-
-    // Lock the viewport to the service area.
-    map.setMaxBounds(serviceBounds.pad(0.02));
-    map.setMinZoom(map.getBoundsZoom(serviceBounds, false));
-    if (state.firstLoad) map.fitBounds(serviceBounds);
-
-    if (!cfg.google_maps_api_key) {
-      useFallbackTiles("No Google Maps API key configured (set RDM_GOOGLE_MAPS_API_KEY).");
-      return;
-    }
-    try {
-      await loadGoogleMaps(cfg.google_maps_api_key);
-    } catch (e) {
-      useFallbackTiles(`Google Maps unavailable: ${e.message}.`);
-      return;
-    }
-    const gOpts = { maxZoom: 20 };
-    const roadmap = L.gridLayer.googleMutant({ ...gOpts, type: "roadmap" }).addTo(map);
-    const satellite = L.gridLayer.googleMutant({ ...gOpts, type: "satellite" });
-    const hybrid = L.gridLayer.googleMutant({ ...gOpts, type: "hybrid" });
-    L.control.layers({ "Google Roadmap": roadmap, "Google Satellite": satellite, "Google Hybrid": hybrid },
-      null, { position: "topright" }).addTo(map);
-  }
+  const map = L.map("map", { zoomControl: true, maxZoom: 20 }).setView([37.4563, 126.7052], 12);   // Incheon
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 20, maxNativeZoom: 19,
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+  }).addTo(map);
 
   const markerLayer = L.markerClusterGroup({
     disableClusteringAtZoom: 18,
@@ -214,45 +148,44 @@
       .join("");
   }
 
-  async function loadMap() {
-    const data = await api(`/incidents/map?${filterQuery()}`);
-    state.mapItems = new Map(data.items.map((i) => [i.id, i]));
+  function loadMap() {
+    state.mapItems = new Map(state.all.filter(matches).map((i) => [i.id, i]));
     renderMap();
-    if (state.firstLoad && data.items.length) {
-      const inArea = data.items.filter((i) => serviceBounds.contains([i.lat, i.lng]));
-      if (inArea.length) map.fitBounds(L.latLngBounds(inArea.map((i) => [i.lat, i.lng])).pad(0.1), { maxZoom: 17 });
+    if (state.firstLoad && state.mapItems.size) {
+      map.fitBounds(L.latLngBounds([...state.mapItems.values()].map((i) => [i.lat, i.lng])).pad(0.1), { maxZoom: 17 });
       state.firstLoad = false;
     }
   }
 
   // ------------------------------------------------------------------ table
-  async function loadTable() {
-    const q = filterQuery();
-    q.set("sort", state.sort.field);
-    q.set("order", state.sort.order);
-    q.set("page", state.page);
-    q.set("page_size", state.pageSize);
-    const data = await api(`/incidents?${q}`);
-    if (data.items.length === 0 && state.page > 1 && data.total > 0) {
-      state.page = data.pages;
-      return loadTable();
-    }
-    state.rows = data.items;
-    state.pages = data.pages;
-    $("#log-total").textContent = `(${data.total})`;
-    $("#pg-info").textContent = `Page ${data.page} of ${data.pages}`;
-    $("#pg-prev").disabled = data.page <= 1;
-    $("#pg-next").disabled = data.page >= data.pages;
+  function sortKey(i) {
+    const f = state.sort.field;
+    return ENUMS[f] ? ENUMS[f].indexOf(i[f]) : f === "created_at" ? Date.parse(i.created_at) : i[f];
+  }
+
+  function loadTable() {
+    const dir = state.sort.order === "asc" ? 1 : -1;
+    const list = [...state.mapItems.values()].sort((a, b) => dir * (sortKey(a) - sortKey(b)));
+    const pages = Math.max(1, Math.ceil(list.length / state.pageSize));
+    state.page = Math.min(Math.max(state.page, 1), pages);
+    state.rows = list.slice((state.page - 1) * state.pageSize, state.page * state.pageSize);
+    $("#log-total").textContent = `(${list.length})`;
+    $("#pg-info").textContent = `Page ${state.page} of ${pages}`;
+    $("#pg-prev").disabled = state.page <= 1;
+    $("#pg-next").disabled = state.page >= pages;
     renderTable();
   }
+
+  const thumb = (i) => photos(i).at(-1)?.image;
+  const photos = (i) => i.reports.filter((r) => r.image);
 
   function renderTable() {
     const tbody = $("#log-table tbody");
     tbody.innerHTML = state.rows
       .map((r) => `
         <tr data-id="${esc(r.id)}" class="${r.id === state.selectedId ? "selected" : ""}">
-          <td>${r.thumbnail_url ? `<img class="thumb" loading="lazy" src="${esc(r.thumbnail_url)}" alt="">` : ""}</td>
-          <td class="coords">${fmtCoord(r.coordinates.lat, r.coordinates.lng)}</td>
+          <td>${thumb(r) ? `<img class="thumb" loading="lazy" src="${esc(thumb(r))}" alt="">` : ""}</td>
+          <td class="coords">${fmtCoord(r.lat, r.lng)}</td>
           <td>${esc(fmtDate(r.created_at))}${r.report_count > 1 ? `<div class="muted">latest ${esc(fmtDate(r.last_report_at))}</div>` : ""}</td>
           <td>${badge("defect_type", r.defect_type)}</td>
           <td>${badge("severity", r.severity)}</td>
@@ -267,25 +200,18 @@
     });
   }
 
-  async function loadStats() {
-    const s = await api("/stats");
-    const open = (s.by_repair_status.awaiting_repair || 0) + (s.by_repair_status.in_progress || 0);
-    const crit = (s.by_severity.critical || 0) + (s.by_severity.high || 0);
+  function loadStats() {
+    const n = (f) => state.all.filter(f).length;
+    const reports = state.all.reduce((sum, i) => sum + i.report_count, 0);
     $("#stats").innerHTML =
-      `<span><b>${s.incidents}</b> incidents</span><span><b>${open}</b> open</span>` +
-      `<span><b>${crit}</b> high/critical</span><span><b>${s.packets}</b> reports</span><span><b>${s.devices}</b> devices</span>`;
+      `<span><b>${state.all.length}</b> incidents</span><span><b>${n((i) => i.repair_status !== "completed")}</b> open</span>` +
+      `<span><b>${n((i) => i.severity === "high" || i.severity === "critical")}</b> high/critical</span><span><b>${reports}</b> reports</span>`;
   }
 
-  async function refreshAll() {
-    try {
-      await Promise.all([loadMap(), loadTable(), loadStats()]);
-    } catch (e) {
-      toast(`Failed to load data: ${e.message}`, true);
-    }
-  }
+  function showAll() { loadMap(); loadTable(); loadStats(); }
 
   // ----------------------------------------------------------------- drawer
-  async function selectIncident(id, { pan }) {
+  function selectIncident(id, { pan }) {
     const prev = state.selectedId;
     state.selectedId = id;
     state.editing = false;
@@ -293,19 +219,10 @@
     refreshMarker(id);
     document.querySelectorAll("#log-table tbody tr").forEach((tr) => tr.classList.toggle("selected", tr.dataset.id === id));
 
-    if (pan) {
-      const item = state.mapItems.get(id) || state.rows.find((r) => r.id === id);
-      if (item) {
-        const ll = item.lat !== undefined ? [item.lat, item.lng] : [item.coordinates.lat, item.coordinates.lng];
-        map.flyTo(ll, Math.max(map.getZoom(), 18), { duration: 0.8 });
-      }
-    }
-    try {
-      state.current = await api(`/incidents/${encodeURIComponent(id)}`);
-      if (state.selectedId === id) renderDrawer();
-    } catch (e) {
-      toast(`Could not load incident: ${e.message}`, true);
-    }
+    state.current = state.all.find((i) => i.id === id) || null;
+    if (!state.current) return toast("That incident is no longer on the map", true);
+    if (pan) map.flyTo([state.current.lat, state.current.lng], Math.max(map.getZoom(), 18), { duration: 0.8 });
+    renderDrawer();
   }
 
   function closeDrawer() {
@@ -331,8 +248,7 @@
   function renderDrawer() {
     const inc = state.current;
     if (!inc) return;
-    const images = inc.images || [];
-    const devices = new Set(images.map((i) => i.device_id)).size;
+    const images = photos(inc);
 
     // Strict vertical order: Gallery → Timestamp → Defect Type → Severity → Repair Status → Actions
     $("#drawer-body").innerHTML = `
@@ -345,7 +261,7 @@
           <div class="caption"><span id="cap-device"></span><span id="cap-index"></span></div>
         </div>
         <div class="camera-found" id="cap-camera"></div>
-        ${images.length > 1 ? `<div class="thumbs" id="thumbs">${images.map((im, i) => `<img src="${esc(im.url)}" data-i="${i}" alt="">`).join("")}</div>` : ""}`
+        ${images.length > 1 ? `<div class="thumbs" id="thumbs">${images.map((im, i) => `<img src="${esc(im.image)}" data-i="${i}" alt="">`).join("")}</div>` : ""}`
         : `<div class="muted">No photos.</div>`}
       </div>
 
@@ -353,10 +269,10 @@
         <div class="section-label">Timestamp</div>
         <dl class="kv">
           <dt>Detected</dt><dd>${esc(fmtDate(inc.created_at))}</dd>
-          ${inc.packet_count > 1 ? `<dt>Latest report</dt><dd>${esc(fmtDate(inc.last_report_at))}</dd>` : ""}
-          <dt>Reports</dt><dd>${inc.report_count} device${inc.report_count === 1 ? "" : "s"} · ${inc.packet_count} packet${inc.packet_count === 1 ? "" : "s"}</dd>
-          <dt>Location</dt><dd class="coords">${fmtCoord(inc.coordinates.lat, inc.coordinates.lng)}</dd>
-          ${inc.peak_intensity != null ? `<dt>Peak vibration</dt><dd>${inc.peak_intensity.toFixed(2)} g</dd>` : ""}
+          ${inc.report_count > 1 ? `<dt>Latest report</dt><dd>${esc(fmtDate(inc.last_report_at))}</dd>` : ""}
+          <dt>Reports</dt><dd>${inc.report_count}</dd>
+          <dt>Location</dt><dd class="coords">${fmtCoord(inc.lat, inc.lng)}${inc.reports.some((r) => r.location !== "gps") ? " (not from GPS)" : ""}</dd>
+          ${inc.peak_g != null ? `<dt>Peak vibration</dt><dd>${inc.peak_g.toFixed(2)} g</dd>` : ""}
         </dl>
       </div>
 
@@ -373,7 +289,7 @@
         </div>
       </div>`;
 
-    if (images.length) setupCarousel(images, devices);
+    if (images.length) setupCarousel(images);
     $("#act-edit").onclick = () => { state.editing = !state.editing; renderDrawer(); };
     $("#act-save").onclick = saveChanges;
     $("#act-delete").onclick = deleteIncident;
@@ -384,12 +300,14 @@
   const TYPE_SOURCE = {
     camera: "Classified by the camera",
     sensor: "Classified from vibration (no camera confirmation)",
-    operator: "Set by an operator",
+    operator: "Set by hand",
   };
+  const CAMERA_TYPE = { pothole: "pothole", speed_bump: "bump" };
+  const REASON = { down: "Jolt down", up: "Jolt up", upload: "Uploaded photo" };
 
   // What the photo detector found in one photo, e.g. "Pothole 89% · 3 cracks"
   function cameraText(im) {
-    const v = im.sensor_metadata && im.sensor_metadata.vision;
+    const v = im.camera;
     if (!v) return "Camera: not checked";
     const parts = [];
     if (v.potholes) parts.push(`Pothole${v.potholes > 1 ? ` ×${v.potholes}` : ""}${v.pothole_confidence != null ? ` ${Math.round(v.pothole_confidence * 100)}%` : ""}`);
@@ -400,7 +318,7 @@
 
   // e.g. " · 3 of 4 photos show a pothole"
   function cameraSummary(images) {
-    const verdicts = images.map((im) => im.sensor_metadata?.vision?.camera_type).filter(Boolean);
+    const verdicts = images.map((im) => CAMERA_TYPE[im.camera?.verdict]).filter(Boolean);
     if (!verdicts.length) return "";
     const counts = {};
     verdicts.forEach((t) => (counts[t] = (counts[t] || 0) + 1));
@@ -413,9 +331,9 @@
     const show = (i) => {
       idx = (i + images.length) % images.length;
       const im = images[idx];
-      $("#slide").src = im.url;
+      $("#slide").src = im.image;
       $("#cap-camera").textContent = cameraText(im);
-      $("#cap-device").textContent = `${im.device_id} · ${fmtDate(im.timestamp)}`;
+      $("#cap-device").textContent = `${REASON[im.reason] || im.reason} · ${fmtDate(im.time)}`;
       $("#cap-index").textContent = `${idx + 1}/${images.length}`;
       document.querySelectorAll("#thumbs img").forEach((t) => t.classList.toggle("active", +t.dataset.i === idx));
     };
@@ -435,16 +353,18 @@
     });
   }
 
-  // ------------------------------------------------- optimistic write paths
-  function applyLocal(id, changes) {
-    if (state.current?.id === id) Object.assign(state.current, changes);
-    const mi = state.mapItems.get(id);
-    if (mi) Object.assign(mi, changes);
-    const row = state.rows.find((r) => r.id === id);
-    if (row) Object.assign(row, changes);
-    refreshMarker(id);
-    renderTable();
-    renderMap(); // heat weights depend on severity/status
+  // ------------------------------------------------------------------ edits
+  async function write(id, opts, done) {
+    state.pendingOps++;
+    try {
+      await api(`/incidents/${encodeURIComponent(id)}`, opts);
+      toast(done);
+    } catch (e) {
+      toast(`Failed: ${e.message}`, true);
+    } finally {
+      state.pendingOps--;
+    }
+    await refresh();
   }
 
   async function saveChanges() {
@@ -454,83 +374,36 @@
       if (s.value !== inc[s.dataset.field]) changes[s.dataset.field] = s.value;
     });
     state.editing = false;
-    if (!Object.keys(changes).length) { renderDrawer(); return; }
-
-    const before = Object.fromEntries(Object.keys(changes).map((k) => [k, inc[k]]));
-    applyLocal(inc.id, changes);
+    if (Object.keys(changes).length) await write(inc.id, { method: "PATCH", body: JSON.stringify(changes) }, "Changes saved");
     renderDrawer();
-    state.pendingOps++;
-    try {
-      const updated = await api(`/incidents/${encodeURIComponent(inc.id)}`, { method: "PATCH", body: JSON.stringify(changes) });
-      if (state.current?.id === updated.id) { state.current = updated; renderDrawer(); }
-      toast("Changes saved");
-    } catch (e) {
-      applyLocal(inc.id, before);
-      if (state.current?.id === inc.id) renderDrawer();
-      toast(`Save failed: ${e.message}`, true);
-    } finally {
-      state.pendingOps--;
-      loadStats().catch(() => {});
-    }
   }
 
   async function deleteIncident() {
     const inc = state.current;
-    if (!inc || !confirm(`Delete this incident and its ${inc.packet_count} report(s)? This cannot be undone.`)) return;
-    const snapshotMap = state.mapItems.get(inc.id);
-    const snapshotRows = state.rows.slice();
-    state.mapItems.delete(inc.id);
-    state.rows = state.rows.filter((r) => r.id !== inc.id);
+    if (!inc || !confirm(`Delete this incident and its ${inc.report_count} report(s) from the map? This cannot be undone.`)) return;
     closeDrawer();
-    renderMap();
-    renderTable();
-    state.pendingOps++;
-    try {
-      await api(`/incidents/${encodeURIComponent(inc.id)}`, { method: "DELETE" });
-      toast("Incident deleted");
-      loadTable().catch(() => {});
-      loadStats().catch(() => {});
-    } catch (e) {
-      if (snapshotMap) state.mapItems.set(inc.id, snapshotMap);
-      state.rows = snapshotRows;
-      renderMap();
-      renderTable();
-      toast(`Delete failed: ${e.message}`, true);
-    } finally {
-      state.pendingOps--;
-    }
+    await write(inc.id, { method: "DELETE" }, "Incident deleted");
   }
 
-  // ------------------------------------------------------------ live events
-  let liveTimer = null;
-  const touched = new Set();
-  function scheduleLiveRefresh(evt) {
-    touched.add(evt.id);
-    if (evt.type === "incident.deleted" && state.selectedId === evt.id && !state.editing) {
-      closeDrawer();
-      toast("The open incident was deleted");
-    }
-    clearTimeout(liveTimer);
-    liveTimer = setTimeout(async function run() {
-      if (state.pendingOps > 0) { liveTimer = setTimeout(run, 500); return; }
-      const ids = new Set(touched);
-      touched.clear();
-      await refreshAll();
-      if (state.selectedId && ids.has(state.selectedId) && !state.editing) {
-        try {
-          state.current = await api(`/incidents/${encodeURIComponent(state.selectedId)}`);
-          renderDrawer();
-        } catch { /* deleted elsewhere */ }
-      }
-    }, 600);
-  }
-
-  function connectEvents() {
+  // ------------------------------------------------------------ live updates
+  async function refresh() {
     const live = $("#live-indicator");
-    const es = new EventSource(`${API}/events`);
-    es.onopen = () => { live.classList.add("on"); live.querySelector(".label").textContent = "live"; };
-    es.onerror = () => { live.classList.remove("on"); live.querySelector(".label").textContent = "reconnecting…"; };
-    es.onmessage = (m) => { try { scheduleLiveRefresh(JSON.parse(m.data)); } catch { /* ignore */ } };
+    try {
+      const data = await api(`/incidents?rev=${state.rev}`);
+      live.classList.add("on");
+      live.querySelector(".label").textContent = "live";
+      if (!data.items || state.pendingOps) return;
+      state.rev = data.rev;
+      state.all = data.items;
+      showAll();
+      if (state.selectedId && !state.editing) {
+        state.current = state.all.find((i) => i.id === state.selectedId) || null;
+        if (state.current) renderDrawer(); else { closeDrawer(); toast("The open incident was deleted"); }
+      }
+    } catch {
+      live.classList.remove("on");
+      live.querySelector(".label").textContent = "reconnecting…";
+    }
   }
 
   // ------------------------------------------------------------ wiring / UI
@@ -551,7 +424,7 @@
   function onFiltersChanged() {
     state.page = 1;
     clearTimeout(filterTimer);
-    filterTimer = setTimeout(refreshAll, 200);
+    filterTimer = setTimeout(showAll, 200);
   }
 
   function wire() {
@@ -576,15 +449,15 @@
           ? { field: f, order: state.sort.order === "desc" ? "asc" : "desc" }
           : { field: f, order: "desc" };
         state.page = 1;
-        loadTable().catch((e) => toast(e.message, true));
+        loadTable();
       }));
     $("#log-table tbody").addEventListener("click", (e) => {
       const tr = e.target.closest("tr[data-id]");
       if (tr) selectIncident(tr.dataset.id, { pan: true });
     });
-    $("#pg-prev").addEventListener("click", () => { state.page--; loadTable().catch((e) => toast(e.message, true)); });
-    $("#pg-next").addEventListener("click", () => { state.page++; loadTable().catch((e) => toast(e.message, true)); });
-    $("#page-size").addEventListener("change", (e) => { state.pageSize = +e.target.value; state.page = 1; loadTable().catch((er) => toast(er.message, true)); });
+    $("#pg-prev").addEventListener("click", () => { state.page--; loadTable(); });
+    $("#pg-next").addEventListener("click", () => { state.page++; loadTable(); });
+    $("#page-size").addEventListener("change", (e) => { state.pageSize = +e.target.value; state.page = 1; loadTable(); });
 
     // Hide / show the incident log (remembered per browser).
     const setLogHidden = (hidden) => {
@@ -611,8 +484,7 @@
 
   wire();
   renderLegend();
-  setupBaseMap();
-  refreshAll().then(openFromHash, openFromHash);
+  refresh().then(openFromHash);
   window.addEventListener("hashchange", openFromHash);
-  connectEvents();
+  setInterval(refresh, 2000);
 })();

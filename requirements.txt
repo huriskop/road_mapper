@@ -1,16 +1,10 @@
-# Web app (backend API + simulator)
-fastapi>=0.115
-uvicorn>=0.30  # [standard] extras skipped: pyyaml has no Python 3.15 wheel yet
-python-multipart>=0.0.9
-pillow>=10.0
-requests>=2.31
-
-# Detectors (sensor_detector.py, vision_detector.py)
-numpy>=1.24
-scipy>=1.10
+# On the Pi install these with apt instead (see README.md):
+#   python3-smbus2 python3-serial python3-picamera2 python3-opencv python3-numpy
+smbus2
+pyserial
+picamera2
 opencv-python>=4.8
-matplotlib>=3.7  # optional, for --plot
-
-# dev / tests
+numpy>=1.24
+# only for sensor_detector.py and the tests
+scipy>=1.10
 pytest>=8.0
-httpx>=0.27

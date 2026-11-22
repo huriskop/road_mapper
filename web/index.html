@@ -4,14 +4,16 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Equipment Check</title>
-  <link rel="stylesheet" href="/static/style.css" />
+  <link rel="stylesheet" href="/web/style.css" />
 </head>
 <body>
   <header>
-    <h1>Road monitor · test bench</h1>
+    <h1>Road defect monitor</h1>
     <nav>
       <a href="/" class="active">Equipment check</a>
       <a href="/capture">Auto capture</a>
+      <a href="/map">Map</a>
+      <a href="/test">Test a photo</a>
     </nav>
     <span class="spacer"></span>
     <span id="link" class="badge">connecting</span>
@@ -90,7 +92,7 @@
     </section>
   </main>
 
-  <script src="/static/common.js"></script>
+  <script src="/web/common.js"></script>
   <script>
     Bench.start();
     const { $, post } = Bench;

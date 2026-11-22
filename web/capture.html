@@ -3,19 +3,17 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Sensors</title>
-  <link rel="stylesheet" href="/static/style.css" />
-  <style>
-    .loglist .camres.ok { color: var(--ok); }
-    .loglist a { color: var(--accent); }
-  </style>
+  <title>Auto Capture</title>
+  <link rel="stylesheet" href="/web/style.css" />
 </head>
 <body>
   <header>
-    <h1>Road monitor · system test</h1>
+    <h1>Road defect monitor</h1>
     <nav>
-      <a href="/" class="active">Sensors</a>
-      <a id="mapLink" href="#" target="_blank" rel="noopener">Map ↗</a>
+      <a href="/">Equipment check</a>
+      <a href="/capture" class="active">Auto capture</a>
+      <a href="/map">Map</a>
+      <a href="/test">Test a photo</a>
     </nav>
     <span class="spacer"></span>
     <span id="link" class="badge">connecting</span>
@@ -80,10 +78,9 @@
 
     <section class="panel log">
       <div class="head">
-        <h2>Sent to the map</h2>
+        <h2>Capture log</h2>
         <span id="count" class="badge">0</span>
-        <button id="snapBtn" class="meta" title="Take a photo now and send it to the map">Photo now</button>
-        <button id="clearBtn" title="Clear this list (photos stay on the Pi and on the map)">Clear</button>
+        <button id="clearBtn" class="meta" title="Clear this list (photos stay on the Pi)">Clear</button>
       </div>
       <div class="body">
         <div class="controls">
@@ -96,64 +93,57 @@
             <output id="thresholdOut">0.40 g</output>
           </label>
           <div class="row">
-            <span class="meta">map server</span>
-            <span id="mapBadge" class="badge">…</span>
-            <span id="mapInfo" class="meta"></span>
-          </div>
-          <div id="simRow" class="row" hidden>
-            <span class="meta">simulator:</span>
-            <button data-sim="pothole">▼ pothole (drop)</button>
-            <button data-sim="bump">▲ bump (lift)</button>
+            <span class="meta">camera detector</span>
+            <span id="detBadge" class="badge">…</span>
+            <span id="detInfo" class="meta"></span>
           </div>
         </div>
         <ul id="log" class="loglist"></ul>
-        <div id="empty" class="empty">No photos yet. Jolt the sensor up or down past the threshold, or press "Photo now".</div>
+        <div id="empty" class="empty">No photos yet. Jolt the sensor up or down past the threshold.</div>
       </div>
     </section>
   </main>
 
-  <dialog id="viewer" class="viewer"><img id="viewerImg" alt="Photo" /></dialog>
+  <dialog id="viewer" class="viewer"><img id="viewerImg" alt="Captured photo" /></dialog>
 
-  <script src="/static/common.js"></script>
+  <script src="/web/common.js"></script>
   <script>
     const { $, post, fmt } = Bench;
     const LABEL = { down: "▼ DOWN", up: "▲ UP", manual: "● MANUAL" };
-    const TYPE = { pothole: "POTHOLE", bump: "SPEED BUMP", crack: "CRACK", unclassified: "UNCLASSIFIED" };
-    const CHIP = { pothole: "pothole", bump: "speed_bump", crack: "crack" };
-    const rows = new Map();               // id -> <li>, so upload results update the same entry
-    let mapUrl = null;                    // map server address as this browser can reach it
+    const SENSOR_SAYS = { down: "pothole", up: "speed_bump" };
+    const VERDICT = { pothole: "POTHOLE", speed_bump: "SPEED BUMP", crack: "CRACKS", none: "nothing found" };
+    const rows = new Map();               // id -> <li>, so detector results update the same entry
 
-    // the Pi sends to 127.0.0.1; the browser needs the Pi's own address
-    function browserUrl(url) {
-      const u = new URL(url);
-      if (["127.0.0.1", "localhost"].includes(u.hostname)) u.hostname = location.hostname;
-      return u.toString().replace(/\/$/, "");
+    const pct = (c) => (c === null || c === undefined ? "" : ` ${Math.round(c * 100)}%`);
+
+    function cameraLine(item) {
+      const a = item.analysis;
+      if (!a) return ["pending", "camera: waiting…"];
+      if (a.status === "queued") return ["pending", "camera: queued…"];
+      if (a.status === "running") return ["pending", "camera: analyzing…"];
+      if (a.status === "skipped") return ["muted", "camera: not analyzed (" + a.message + ")"];
+      if (a.status === "error") return ["bad", "camera: detector error (" + a.message + ")"];
+      const parts = [];
+      if (a.potholes) parts.push(`${a.potholes} pothole${a.potholes > 1 ? "s" : ""}${pct(a.pothole_confidence)}`);
+      if (a.speed_bumps) parts.push(`${a.speed_bumps} speed bump${a.speed_bumps > 1 ? "s" : ""}${pct(a.speed_bump_confidence)}`);
+      if (a.cracks) parts.push(`${a.cracks} crack${a.cracks > 1 ? "s" : ""}`);
+      return [a.verdict, "camera: " + (parts.join(" · ") || "nothing found") + ` · ${(a.time_ms / 1000).toFixed(1)} s`];
     }
 
-    function uploadLine(item) {
-      const u = item.upload;
-      const where = u?.location === "fallback" ? " · fallback location" : "";
-      if (!u || u.status === "queued") return ["pending", "map: waiting…"];
-      if (u.status === "sending") return ["pending", "map: sending, server is analyzing the photo…"];
-      if (u.status === "skipped") return ["muted", "map: not sent (" + u.message + ")"];
-      if (u.status === "error") return ["bad", "map: failed (" + u.message + ")"];
-      const c = u.camera || {}, seen = [];
-      if (c.potholes) seen.push(`${c.potholes} pothole${c.potholes > 1 ? "s" : ""}`);
-      if (c.speed_bumps) seen.push(`${c.speed_bumps} speed bump${c.speed_bumps > 1 ? "s" : ""}`);
-      if (c.cracks) seen.push(`${c.cracks} crack${c.cracks > 1 ? "s" : ""}`);
-      const what = u.created ? "new incident" : `added to an incident (${u.reports} reports)`;
-      return ["ok", `${what} · ${u.severity} · camera: ${seen.join(", ") || "nothing found"}${where}`];
+    function agreement(item) {
+      const a = item.analysis, expected = SENSOR_SAYS[item.reason];
+      if (!a || a.status !== "done" || !expected) return null;
+      return a.verdict === expected ? ["ok", "✓ camera agrees with the sensor"] : ["bad", "✗ camera does not confirm the sensor"];
     }
 
     function render(li, item) {
       li.replaceChildren();
-      const u = item.upload;
       const img = document.createElement("img");
-      const src = u?.image && mapUrl ? mapUrl + u.image : item.image;   // the labelled photo from the map server
+      const src = item.annotated || item.image;
       img.alt = item.reason + " photo";
       if (src) {
         img.src = src;
-        img.title = u?.image ? "labelled by the map server" : "original photo";
+        img.title = item.annotated ? "labelled by the detector" : "original photo";
         img.addEventListener("click", () => { $("viewerImg").src = src; $("viewer").showModal(); });
       }
       const info = document.createElement("div");
@@ -166,28 +156,29 @@
       dir.textContent = LABEL[item.reason] || item.reason;
       head.append(dir, item.peak_g !== null ? ` peak ${Math.abs(item.peak_g).toFixed(2)} g · sensor: ${item.guess}` : "");
 
-      const [cls, text] = uploadLine(item);
-      const res = line("camres " + cls, text);
-      if (u?.status === "sent") {
+      const [cls, text] = cameraLine(item);
+      const cam = line("camres " + cls, text);
+      if (item.analysis?.status === "done") {
         const chip = document.createElement("b");
-        chip.className = "chip " + (CHIP[u.defect_type] || "");
-        chip.textContent = TYPE[u.defect_type] || u.defect_type;
-        res.prepend(chip, " ");
-        if (mapUrl) {
-          const a = document.createElement("a");
-          a.href = `${mapUrl}/#incident-${u.incident_id}`;
-          a.target = "_blank";
-          a.rel = "noopener";
-          a.textContent = "show on the map ↗";
-          info.append(a);
-        }
+        chip.className = "chip " + item.analysis.verdict;
+        chip.textContent = VERDICT[item.analysis.verdict];
+        cam.prepend(chip, " ");
       }
+      const agree = agreement(item);
+      if (agree) line("agree " + agree[0], agree[1]);
 
       const time = new Date(item.time).toLocaleTimeString([], { hour12: false }) + "." + item.time.slice(20, 23);
       line("t", `#${item.id} · ${time}`);
       const where = item.lat !== null && item.lat !== undefined
         ? `${fmt(item.lat, 6)}, ${fmt(item.lng, 6)}${item.gps_fix ? "" : " (no fix)"}` : "no GPS position";
       line("", where + (item.speed_kmh !== null && item.speed_kmh !== undefined ? ` · ${item.speed_kmh} km/h` : ""));
+      const m = item.map;
+      if (m && m.id) {
+        const a = document.createElement("a");
+        a.href = "/map#incident-" + m.id;
+        a.textContent = `on the map: ${m.type} · ${m.severity}${m.location === "fallback" ? " (fallback position)" : ""}`;
+        line("", "").append(a);
+      } else if (m) line("", m.status);
       li.append(img, info);
     }
 
@@ -202,28 +193,22 @@
       }
       if (Number(li.dataset.seq || 0) > item.seq) return;      // history fetch can be older than the stream
       li.dataset.seq = item.seq;
-      li._item = item;
       render(li, item);
     }
 
-    // controls + map server status
+    // controls + detector status
     let lastTrigger = null;
     Bench.on("state", (s) => {
-      $("simRow").hidden = s.imu.source !== "sim";
-      const m = s.map;
-      if (!mapUrl) {
-        mapUrl = browserUrl(m.url);
-        $("mapLink").href = mapUrl + "/";
-        rows.forEach((li) => li._item && render(li, li._item));   // add map links / labelled photos
-      }
-      $("mapBadge").className = "badge " + (m.online ? "ok" : "bad");
-      $("mapBadge").textContent = m.online ? "online" : "offline";
-      $("mapBadge").title = m.error || "";
-      $("mapInfo").textContent = !m.online ? (m.error || "") : [
-        `${m.sent} sent`, m.failed ? `${m.failed} failed` : "", m.queued ? `${m.queued} waiting` : "",
-        s.gps.fix ? "position: GPS" : m.fallback ? `no fix: fallback ${m.fallback.join(", ")}` : "no GPS fix: photos are not sent",
-        m.roi ? "photo cropped to --roi" : "",
-      ].filter(Boolean).join(" · ");
+      const d = s.detector;
+      const [cls, text] = !d.available ? ["bad", "off"] : !d.ready ? ["wait", "loading models"] : ["ok", "ready"];
+      $("detBadge").className = "badge " + cls;
+      $("detBadge").textContent = text;
+      $("detBadge").title = d.error || "";
+      const models = d.models ? Object.entries(d.models).filter(([, v]) => v).map(([k]) => k.replace("_", " ")) : [];
+      $("detInfo").textContent = !d.available ? (d.error || "")
+        : [d.detect.join(", "), models.length ? "models: " + models.join(", ") : "no model files (rules only)",
+           d.queued ? `${d.queued} waiting` : "", d.last_ms ? `last ${(d.last_ms / 1000).toFixed(1)} s` : ""]
+          .filter(Boolean).join(" · ");
 
       const t = s.trigger;
       if (JSON.stringify(t) === lastTrigger) return;             // only sync when the server's values change
@@ -235,9 +220,6 @@
     $("threshold").addEventListener("input", () => { $("thresholdOut").textContent = Number($("threshold").value).toFixed(2) + " g"; });
     $("threshold").addEventListener("change", () => post("/api/trigger", { threshold_g: Number($("threshold").value) }));
     $("enabled").addEventListener("change", () => post("/api/trigger", { enabled: $("enabled").checked }));
-    document.querySelectorAll("[data-sim]").forEach((b) =>
-      b.addEventListener("click", () => post("/api/simulate", { kind: b.dataset.sim }).catch((e) => alert(e.message))));
-    $("snapBtn").addEventListener("click", () => post("/api/snapshot").catch((e) => alert(e.message)));
     $("clearBtn").addEventListener("click", () => {
       $("log").replaceChildren(); rows.clear(); $("count").textContent = 0; $("empty").hidden = false;
     });
