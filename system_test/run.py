@@ -74,7 +74,9 @@ class Uploader:
                 "fallback": self.fallback, "roi": self.roi}
 
     def submit(self, item: dict, frame: bytes | None, mime: str, name: str | None) -> None:
-        if not frame or mime != "image/jpeg":
+        if not frame:
+            return self.store.update(item["id"], upload={"status": "skipped", "message": "no camera photo (camera stopped sending frames)"})
+        if mime != "image/jpeg":
             return self.store.update(item["id"], upload={"status": "skipped", "message": "no camera photo (camera is simulated)"})
         if item.get("gps_fix") and item.get("lat") is not None:
             where = (item["lat"], item["lng"], "gps")

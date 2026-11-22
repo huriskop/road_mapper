@@ -388,21 +388,32 @@ def _jpeg_encoder():
 
 
 class Camera:
-    """Keeps the latest frame. kind: auto | picamera2 | opencv | sim."""
+    """Keeps the latest frame. kind: auto | picamera2 | opencv | sim.
+
+    A camera that stops sending frames is reported as an error and reopened until it works again.
+    Meanwhile latest() returns no frame, so an old picture is never saved or sent as a new photo."""
+
+    STALL_S = 3.0        # no frame for this long: close and reopen the camera
+    STALE_S = 1.0        # a frame older than this is not a photo of "now"
+    RETRY_S = 2.0        # pause before each reopen attempt
+    CLOSE_S = 5.0        # a close that takes longer is reported as a stuck driver
 
     def __init__(self, kind: str = "auto", size: tuple[int, int] = (640, 480), index: int = 0, fps: float = 15) -> None:
         self.source, self.error, self.mime = "sim", None, "image/svg+xml"
         self.size, self.fps_limit, self.fps = size, fps, 0.0
         self._frame: bytes | None = None
+        self._frame_at = 0.0                                  # time.monotonic() of the latest frame
         self._seq = 0
+        self._index = index
+        self.restarts = 0
         self._cond = threading.Condition()
-        grab = None
+        grab = close = None
         errors = []
         for k in (["picamera2", "opencv"] if kind == "auto" else [kind]):
             if k == "sim":
                 break
             try:
-                grab = self._open_picamera2() if k == "picamera2" else self._open_opencv(index)
+                grab, close = self._open(k)
                 self.source, self.mime = k, "image/jpeg"
                 break
             except Exception as exc:
@@ -416,16 +427,32 @@ class Camera:
             busy = other_users("/dev/video0", ignore=("pipewire", "wireplumber")) if os.path.exists("/dev/video0") else ""
             if busy:
                 self.error = f"camera is also used by [{busy}]: stop that program. " + (self.error or "")
-        threading.Thread(target=self._run, args=(grab,), daemon=True, name="camera").start()
+        threading.Thread(target=self._run, args=(grab, close), daemon=True, name="camera").start()
+
+    def _open(self, kind: str):
+        """(grab, close) functions for a real camera."""
+        return self._open_picamera2() if kind == "picamera2" else self._open_opencv(self._index)
 
     def _open_picamera2(self):
         from picamera2 import Picamera2
-        cam = Picamera2()
-        # "RGB888" is stored as B, G, R in memory, the same order OpenCV uses
-        cam.configure(cam.create_video_configuration(main={"size": self.size, "format": "RGB888"}))
-        cam.start()
         enc = _jpeg_encoder()
-        return lambda: enc(cam.capture_array())
+        cam = Picamera2()
+        try:
+            # "RGB888" is stored as B, G, R in memory, the same order OpenCV uses
+            cam.configure(cam.create_video_configuration(main={"size": self.size, "format": "RGB888"}))
+            cam.start()
+        except Exception:
+            cam.close()                                       # or the next attempt finds it busy
+            raise
+
+        def grab():
+            # capture_array() alone waits forever when the sensor stops sending frames
+            job = cam.capture_array(wait=False)
+            try:
+                return enc(cam.wait(job, timeout=self.STALL_S))
+            except TimeoutError:
+                raise RuntimeError(f"no new frame for {self.STALL_S:g} s") from None
+        return grab, cam.close
 
     def _open_opencv(self, index: int):
         import cv2
@@ -443,7 +470,7 @@ class Camera:
             if not ok:
                 raise RuntimeError("camera stopped sending frames")
             return enc(frame)
-        return grab
+        return grab, cap.release
 
     def _sim_frame(self) -> bytes:
         w, h = self.size
@@ -461,19 +488,32 @@ class Camera:
                 f'<text x="20" y="70" fill="#9aa4b2" font-family="monospace" font-size="18">{stamp}  frame {self._seq}</text>'
                 f'</svg>').encode()
 
-    def _run(self, grab) -> None:
+    def _run(self, grab, close) -> None:
         period = 1.0 / self.fps_limit
         last = time.perf_counter()
         while True:
             start = time.perf_counter()
             try:
+                if grab is None:
+                    grab, close = self._open(self.source)
                 frame = grab()
             except Exception as exc:
-                self.error = f"capture failed: {exc}"
-                time.sleep(1)
+                if self.source == "sim":
+                    self.error = f"capture failed: {exc}"
+                    time.sleep(1)
+                    continue
+                self.restarts += 1
+                self.error = (f"camera stopped: {exc}. Reopening (attempt {self.restarts}); "
+                              "if it keeps stopping, check the ribbon cable")
+                self._close(close)
+                grab = close = None
+                time.sleep(self.RETRY_S)
                 continue
+            if self.restarts and (self.error or "").startswith("camera st"):
+                self.error = None                             # it works again
             with self._cond:
                 self._frame = frame
+                self._frame_at = time.monotonic()
                 self._seq += 1
                 self._cond.notify_all()
             now = time.perf_counter()
@@ -481,9 +521,30 @@ class Camera:
             last = now
             time.sleep(max(0.0, period - (now - start)))
 
+    def _close(self, close) -> None:
+        """Close the camera. Returns only once it is closed: a second open would find it busy."""
+        if close is None:
+            return
+
+        def run():
+            try:
+                close()
+            except Exception:                                 # already broken; the reopen will tell
+                pass
+        t = threading.Thread(target=run, daemon=True, name="camera-close")
+        t.start()
+        t.join(self.CLOSE_S)
+        while t.is_alive():
+            self.error = "camera stuck: the driver does not close it. Stop this program and check the ribbon cable"
+            t.join(self.CLOSE_S)
+
+    def _fresh(self) -> bool:
+        return self._frame is not None and time.monotonic() - self._frame_at <= self.STALE_S
+
     def latest(self) -> tuple[bytes | None, str]:
+        """The current frame, or None when the camera has stopped sending them."""
         with self._cond:
-            return self._frame, self.mime
+            return (self._frame if self._fresh() else None), self.mime
 
     def wait(self, seq: int, timeout: float = 2.0) -> tuple[bytes | None, int]:
         """Block until a frame newer than seq exists."""
@@ -492,9 +553,9 @@ class Camera:
             return self._frame, self._seq
 
     def info(self) -> dict:
-        return {"ok": self._frame is not None and not (self.error or "").startswith("capture failed"),
-                "source": self.source, "error": self.error, "mime": self.mime,
-                "fps": round(self.fps, 1), "size": list(self.size)}
+        fresh = self._fresh()
+        return {"ok": fresh, "source": self.source, "error": self.error, "mime": self.mime,
+                "fps": round(self.fps, 1) if fresh else 0.0, "size": list(self.size), "restarts": self.restarts}
 
 
 # =========================================================================== captures
