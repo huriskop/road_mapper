@@ -32,6 +32,7 @@ ROOT = Path(__file__).resolve().parent
 WEB = ROOT / "web"
 PAGES = {"/": "index.html", "/capture": "capture.html", "/map": "map.html", "/test": "test.html"}
 MIME = {".html": "text/html; charset=utf-8", ".css": "text/css", ".js": "application/javascript", ".jpg": "image/jpeg"}
+VIDEO_FPS = 3        # live view only. Sending much data over Wi-Fi stalls the camera (see README.md)
 CLIENT_GONE = (BrokenPipeError, ConnectionResetError, ConnectionAbortedError)
 
 
@@ -243,6 +244,7 @@ class Handler(BaseHTTPRequestHandler):
             if frame:
                 self.wfile.write(b"--frame\r\nContent-Type: image/jpeg\r\nContent-Length: "
                                  + str(len(frame)).encode() + b"\r\n\r\n" + frame + b"\r\n")
+            time.sleep(1 / VIDEO_FPS)
 
 
 def lan_address() -> str:

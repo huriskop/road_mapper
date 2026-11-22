@@ -37,7 +37,7 @@ but not put on the map, unless `--fallback-location` is given. Test photos never
 
 ```bash
 sudo raspi-config     # Interface Options: I2C on; Serial Port: login shell off, hardware on. Then reboot
-sudo apt install -y python3-smbus2 python3-serial python3-picamera2 python3-opencv python3-numpy
+sudo apt install -y python3-smbus2 python3-serial rpicam-apps python3-opencv python3-numpy
 ```
 
 Use the system `python3`, not a venv. Download the two model files as described in
@@ -57,7 +57,10 @@ The Pi camera goes on the ribbon connector. Mount the MPU-6050 flat and rigid, X
 
 - **Camera "used by [...]"**: another program has the camera, for example `roadflag-edge`. Stop it with
   `sudo systemctl stop roadflag-edge`.
-- **Camera "no new frame"**: it froze. The program reopens it by itself; if it keeps happening, check the ribbon cable.
+- **Camera "no new frame"**: it froze. The program restarts it by itself. On our Pi this happens while the Pi
+  *sends* a lot over Wi-Fi: at full transmit power the camera got 0 frames, at 5 dBm it ran normally. Move the
+  camera ribbon away from the Wi-Fi antenna, use a 5 GHz hotspot or Ethernet, and do not copy files from the Pi
+  during a test. This is why the live view runs at only 3 frames per second; photos are not affected by that.
 - **GPS no fix**: needs open sky; the first fix can take a few minutes.
 
 ## Files

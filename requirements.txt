@@ -1,8 +1,7 @@
 # On the Pi install these with apt instead (see README.md):
-#   python3-smbus2 python3-serial python3-picamera2 python3-opencv python3-numpy
+#   python3-smbus2 python3-serial rpicam-apps python3-opencv python3-numpy
 smbus2
 pyserial
-picamera2
 opencv-python>=4.8
 numpy>=1.24
 # only for sensor_detector.py and the tests

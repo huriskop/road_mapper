@@ -1,12 +1,15 @@
 """Hardware readers for the Raspberry Pi: MPU-6050 (I2C), GPS (NMEA over serial), Pi camera.
 
 A device that is missing or fails shows an error on the page and is retried until it works.
-Needs smbus2, pyserial, picamera2 and cv2 (apt packages, see README.md)."""
+Needs smbus2, pyserial and rpicam-vid (apt packages, see README.md)."""
 from __future__ import annotations
 
 import collections
 import math
 import os
+import select
+import subprocess
+import tempfile
 import threading
 import time
 from datetime import datetime, timezone
@@ -318,17 +321,20 @@ class Gps:
 class Camera:
     """Keeps the latest frame of the Pi camera as a JPEG.
 
-    A camera that cannot be opened or stops sending frames is reported as an error and reopened
-    until it works. Meanwhile latest() returns no frame, so an old picture is never saved as a new photo."""
+    The video comes from the rpicam-vid program, which can be killed and restarted cleanly. A camera
+    that cannot be opened or stops sending frames is reported as an error and restarted until it
+    works. Meanwhile latest() returns no frame, so an old picture is never saved as a new photo."""
 
-    STALL_S = 3.0        # no frame for this long: close and reopen the camera
+    STALL_S = 3.0        # no frame for this long: restart the camera
     STALE_S = 1.0        # a frame older than this is not a photo of "now"
-    RETRY_S = 2.0        # pause before each reopen attempt
-    CLOSE_S = 5.0        # a close that takes longer is reported as a stuck driver
+    RETRY_S = 2.0        # pause before each restart
+    END = b"\xff\xd9"    # last two bytes of every JPEG
 
-    def __init__(self, size: tuple[int, int] = (640, 480), fps: float = 15) -> None:
+    def __init__(self, size: tuple[int, int] = (640, 480), fps: int = 15) -> None:
         self.error: str | None = None
-        self.size, self.fps_limit, self.fps = size, fps, 0.0
+        self.size, self.fps = size, 0.0
+        self.command = ["rpicam-vid", "--nopreview", "--timeout", "0", "--width", str(size[0]), "--height", str(size[1]),
+                        "--framerate", str(fps), "--codec", "mjpeg", "--quality", "80", "--flush", "--output", "-"]
         self.restarts = 0
         self._stop = threading.Event()
         self._frame: bytes | None = None
@@ -338,85 +344,68 @@ class Camera:
         self._thread = threading.Thread(target=self._run, daemon=True, name="camera")
         self._thread.start()
 
-    def _open(self):
-        """(grab, close) functions for the Pi camera."""
-        import cv2
-        from picamera2 import Picamera2
-        try:
-            cam = Picamera2()
-        except Exception as exc:
-            # pipewire/wireplumber always hold the device; any other program keeps the camera busy
-            busy = other_users("/dev/video0", ignore=("pipewire", "wireplumber"))
-            raise RuntimeError(f"used by [{busy}], stop that program" if busy else f"cannot open it ({exc})") from exc
-        try:
-            # "RGB888" is stored as B, G, R in memory, the same order OpenCV uses
-            cam.configure(cam.create_video_configuration(main={"size": self.size, "format": "RGB888"}))
-            cam.start()
-        except Exception:
-            cam.close()                                       # or the next attempt finds it busy
-            raise
-
-        def grab() -> bytes:
-            # capture_array() alone waits forever when the sensor stops sending frames
-            job = cam.capture_array(wait=False)
-            try:
-                bgr = cam.wait(job, timeout=self.STALL_S)
-            except TimeoutError:
-                raise RuntimeError(f"no new frame for {self.STALL_S:g} s") from None
-            return cv2.imencode(".jpg", bgr, [cv2.IMWRITE_JPEG_QUALITY, 80])[1].tobytes()
-        return grab, cam.close
+    def _frames(self, proc: subprocess.Popen):
+        """JPEG frames from rpicam-vid, as they arrive."""
+        fd, buf = proc.stdout.fileno(), b""
+        while not self._stop.is_set():
+            if not select.select([fd], [], [], self.STALL_S)[0]:
+                raise RuntimeError(f"no new frame for {self.STALL_S:g} s")
+            chunk = os.read(fd, 1 << 16)
+            if not chunk:
+                raise RuntimeError("rpicam-vid ended")
+            buf += chunk
+            *done, buf = buf.split(self.END)
+            for body in done:
+                yield body + self.END
 
     def _run(self) -> None:
-        period = 1.0 / self.fps_limit
-        last = time.perf_counter()
-        grab = close = None
         while not self._stop.is_set():
-            start = time.perf_counter()
+            proc = None
+            with tempfile.TemporaryFile() as log:
+                try:
+                    proc = subprocess.Popen(self.command, stdout=subprocess.PIPE, stderr=log,
+                                            env={**os.environ, "LIBCAMERA_LOG_LEVELS": "*:ERROR"})
+                    last = time.monotonic()
+                    for frame in self._frames(proc):
+                        now = time.monotonic()
+                        with self._cond:
+                            self._frame, self._frame_at = frame, now
+                            self._seq += 1
+                            self._cond.notify_all()
+                        self.fps = 0.9 * self.fps + 0.1 / max(now - last, 1e-3)
+                        last, self.error = now, None
+                except Exception as exc:
+                    self.restarts += 1
+                    self.error = f"camera not working: {self._why(exc, log)}. Restarting it (attempt {self.restarts})"
+                self._end(proc)
+            self._stop.wait(self.RETRY_S)
+
+    def _why(self, exc: Exception, log) -> str:
+        # pipewire/wireplumber always hold the device; any other program keeps the camera busy
+        busy = other_users("/dev/video0", ignore=("pipewire", "wireplumber", "rpicam-vid"))
+        if busy:
+            return f"used by [{busy}], stop that program"
+        log.seek(0)
+        errors = [ln.strip() for ln in log.read().decode(errors="replace").splitlines() if "ERROR" in ln]
+        return f"{exc} ({errors[-1][-120:]})" if errors else str(exc)
+
+    @staticmethod
+    def _end(proc: subprocess.Popen | None) -> None:
+        if proc is None:
+            return
+        for stop in (proc.terminate, proc.kill):
+            stop()
             try:
-                if grab is None:
-                    grab, close = self._open()
-                frame = grab()
-            except Exception as exc:
-                self.restarts += 1
-                self.error = (f"camera not working: {exc}. Reopening (attempt {self.restarts}); "
-                              "if this repeats, check the ribbon cable")
-                self._close(close)
-                grab = close = None
-                time.sleep(self.RETRY_S)
-                continue
-            self.error = None
-            with self._cond:
-                self._frame = frame
-                self._frame_at = time.monotonic()
-                self._seq += 1
-                self._cond.notify_all()
-            now = time.perf_counter()
-            self.fps = 0.9 * self.fps + 0.1 * (1.0 / max(now - last, 1e-3))
-            last = now
-            time.sleep(max(0.0, period - (now - start)))
-        self._close(close)
+                proc.wait(3)
+                break
+            except subprocess.TimeoutExpired:
+                pass
+        proc.stdout.close()
 
     def shutdown(self) -> None:
         """Release the camera before the program ends."""
         self._stop.set()
-        self._thread.join(8)
-
-    def _close(self, close) -> None:
-        """Close the camera. Returns only once it is closed: a second open would find it busy."""
-        if close is None:
-            return
-
-        def run():
-            try:
-                close()
-            except Exception:                                 # already broken; the reopen will tell
-                pass
-        t = threading.Thread(target=run, daemon=True, name="camera-close")
-        t.start()
-        t.join(self.CLOSE_S)
-        while t.is_alive():
-            self.error = "camera stuck: the driver does not close it. Stop this program and check the ribbon cable"
-            t.join(self.CLOSE_S)
+        self._thread.join(10)
 
     def _fresh(self) -> bool:
         return self._frame is not None and time.monotonic() - self._frame_at <= self.STALE_S
@@ -434,5 +423,5 @@ class Camera:
 
     def info(self) -> dict:
         fresh = self._fresh()
-        return {"ok": fresh, "error": self.error,
-                "fps": round(self.fps, 1) if fresh else 0.0, "size": list(self.size), "restarts": self.restarts}
+        return {"ok": fresh, "error": self.error, "fps": round(self.fps, 1) if fresh else 0.0,
+                "size": list(self.size), "restarts": self.restarts}
