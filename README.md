@@ -57,10 +57,16 @@ The Pi camera goes on the ribbon connector. Mount the MPU-6050 flat and rigid, X
 
 - **Camera "used by [...]"**: another program has the camera, for example `roadflag-edge`. Stop it with
   `sudo systemctl stop roadflag-edge`.
-- **Camera "no new frame"**: it froze. The program restarts it by itself. On our Pi this happens while the Pi
-  *sends* a lot over Wi-Fi: at full transmit power the camera got 0 frames, at 5 dBm it ran normally. Move the
-  camera ribbon away from the Wi-Fi antenna, use a 5 GHz hotspot or Ethernet, and do not copy files from the Pi
-  during a test. This is why the live view runs at only 3 frames per second; photos are not affected by that.
+- **Camera "no new frame"**: it froze. The program restarts it by itself. On our Pi the cause is the Wi-Fi
+  transmitter: with pages open, 4 freezes in 2 minutes at full power and none at 5 dBm. Before a test, run
+
+  ```bash
+  sudo iw dev wlan0 set txpower fixed 500      # 5 dBm; a reboot sets it back to full power
+  ```
+
+  Better: move the camera ribbon away from the Wi-Fi antenna, or use a 5 GHz hotspot or Ethernet. Do not copy
+  large files from the Pi during a test. The live view runs at only 3 frames per second to send less;
+  jolt photos use the full-rate camera.
 - **GPS no fix**: needs open sky; the first fix can take a few minutes.
 
 ## Files
