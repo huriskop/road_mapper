@@ -15,7 +15,7 @@ import vision_detector as vd  # noqa: E402
 
 USER = ROOT / "test_images" / "user"
 needs_models = pytest.mark.skipif(
-    not (ROOT / "models" / "pothole_1class.onnx").exists(), reason="trained model files not downloaded")
+    not (ROOT / "models" / "road_damage_5class_v8n.onnx").exists(), reason="trained model file not present")
 
 
 def kinds(path: Path) -> set[str]:
@@ -47,3 +47,13 @@ def test_painted_marking_detector_ignores_lane_dashes():
         y = 440 - i * 80
         cv2.rectangle(img, (310, y - 40), (330, y), (240, 240, 240), -1)
     assert vd.detect_bump_markings(img) == []
+
+
+@needs_models
+def test_detect_limits_the_types_and_nothing_is_found_on_a_blank_picture():
+    import numpy as np
+    assert vd.road_model() is not None
+    assert vd.analyze(np.full((480, 640, 3), 90, np.uint8))[0] == []
+    img = cv2.imread(str(ROOT / "test_images" / "real" / "pothole" / "Gurt_Pothole_3bf7d8.jpg"))
+    assert {d.kind for d in vd.analyze(img)[0]} == {"pothole"}
+    assert vd.analyze(img, detect=("crack",))[0] == []

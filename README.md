@@ -27,7 +27,7 @@ Useful options (`python3 run.py --help` lists them all):
 |---|---|
 | `--fallback-location 37.4563,126.7052` | Indoors: position to use while the GPS has no fix |
 | `--roi 0.06,0.12,1,0.72` | The camera looks at a picture on a screen: analyze only that part |
-| `--detect pothole,crack` | Skip the slow speed-bump model: about 2 s per photo instead of 5–7 s |
+| `--detect pothole,crack` | Report only these types |
 | `--threshold 0.4` | How strong a jolt must be, in g |
 
 Photos and `incidents.json` (the map's data) are saved in `data/`. Jolts without a GPS fix are logged
@@ -40,9 +40,8 @@ sudo raspi-config     # Interface Options: I2C on; Serial Port: login shell off,
 sudo apt install -y python3-smbus2 python3-serial rpicam-apps python3-opencv python3-numpy
 ```
 
-Use the system `python3`, not a venv. Download the two model files as described in
-[models/README.md](models/README.md). Without them, potholes fall back to image rules and speed bumps
-are found only by their painted markings.
+Use the system `python3`, not a venv. The trained model is in git, nothing to download. See
+[models/README.md](models/README.md).
 
 | MPU-6050 | Pi pin | | GPS | Pi pin |
 |---|---|---|---|---|
@@ -89,12 +88,11 @@ The Pi camera goes on the ribbon connector. Mount the MPU-6050 flat and rigid, X
 from the gyro, so turning the sensor is not a jolt. Past ±0.4 g a photo is taken; the direction of the first
 crossing gives the type and the peak over the next 0.3 s gives the severity.
 
-**Camera:** potholes use a trained YOLOv8 model (8 of 12 test photos). Cracks use image rules, limited to the
-road surface. Speed bumps use a trained model plus rules for painted bumps; it misses most bumps (3 of 15), so
-the jolt is the better bump signal. A camera pothole or bump sets the type over the jolt's direction; camera
-cracks count only when there was no jolt.
+**Camera:** one trained YOLOv8n model finds potholes, speed bumps and cracks, about 0.5 s per photo on the Pi 4.
+A camera pothole or bump sets the type over the jolt's direction; camera cracks count only when there was no jolt.
 
-**Known limit:** the crack rules expect a road. Indoors they report desk edges and shadows as cracks.
+**Known limits:** this is a first, short training run. Close-up cracks are often missed or called potholes, and
+some humps are missed, so the jolt is still the better bump signal. See [models/README.md](models/README.md).
 
 ```bash
 python3 vision_detector.py road.jpg -o out.jpg     # one photo

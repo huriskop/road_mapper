@@ -7,6 +7,7 @@ __pycache__/
 data/
 # large model weights (see models/README.md)
 models/*.onnx
+!models/road_damage_5class_v8n.onnx
 test_images/results/
 test_images/user/
 

@@ -100,15 +100,15 @@
         </fieldset>
         <div class="conf">
           <label for="conf">Pothole confidence cut-off</label>
-          <input type="range" id="conf" min="0.1" max="0.9" step="0.05" value="0.5" />
-          <output id="conf-out" for="conf">50%</output>
+          <input type="range" id="conf" min="0.1" max="0.9" step="0.05" value="0.25" />
+          <output id="conf-out" for="conf">25%</output>
         </div>
         <div class="actions">
           <button class="btn" type="button" id="rerun" disabled>Re-run with these settings</button>
           <button class="btn" type="button" id="clear" disabled>Clear results</button>
         </div>
       </div>
-      <p class="hint">Lower the cut-off to catch more potholes (and more false alarms); raise it to keep only confident ones. Speed bumps use a fixed 50% cut-off. On the Pi one photo takes several seconds.</p>
+      <p class="hint">Lower the cut-off to catch more potholes (and more false alarms); raise it to keep only confident ones. Cracks and speed bumps use a fixed 15% cut-off. On the Pi one photo takes about half a second.</p>
     </section>
 
     <section class="results" id="results" aria-live="polite"></section>
@@ -169,7 +169,7 @@
 
     function render(card, head, placeholder, file, data) {
       if (!data.models.pothole) {
-        $("model-status").textContent = "Pothole model file missing on the Pi (models/pothole_1class.onnx): using the older image rules for potholes. See models/README.md.";
+        $("model-status").textContent = "No trained pothole model on the Pi: using the older image rules. See models/README.md.";
         $("model-status").classList.add("warn");
       }
       const pot = data.defects.filter(d => d.kind === "pothole");
@@ -188,7 +188,7 @@
       if (data.detect.includes("speed_bump")) parts.push(bmp.length ? plural(bmp.length, "speed bump", "speed bumps") : "no speed bumps");
       found.append(el("div", { class: "verdict " + (pot.length || crk.length ? "yes" : "no"), text: parts.join(", ") }));
       if (data.detect.includes("speed_bump") && !data.models.speed_bump) {
-        found.append(el("p", { class: "hint", text: "Speed bump model is not installed on the Pi (models/road_anomaly_7class.onnx)." }));
+        found.append(el("p", { class: "hint", text: "No trained speed bump model on the Pi." }));
       }
 
       if (data.defects.length) {
@@ -276,7 +276,7 @@
     $("zoom").addEventListener("click", () => $("zoom").close());
 
     fetch("/api/state").then(() => {
-      $("model-status").textContent = "Potholes and speed bumps: trained YOLOv8 models. Cracks: image rules.";
+      $("model-status").textContent = "Potholes, speed bumps and cracks: one trained YOLOv8n model (see models/README.md).";
     }).catch(() => {
       $("model-status").textContent = "run.py is not reachable. Start it on the Pi, then reload this page.";
       $("model-status").classList.add("warn");

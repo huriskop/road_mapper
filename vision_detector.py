@@ -360,6 +360,38 @@ def road_mask(bgr: np.ndarray, min_frac: float = 0.15, max_hole_frac: float = 0.
 _MODEL_CACHE: dict[str, object] = {}
 
 
+# cut-offs of the road damage model, chosen on validation photos
+ROAD_CONF = {"pothole": 0.25, "crack": 0.15, "speed_bump": 0.15}
+
+
+def road_model():
+    """Our trained model for all types (models/road_damage_5class_v8n.onnx), or None if it is not there."""
+    if "road" not in _MODEL_CACHE:
+        try:
+            import pothole_model as pm
+            path = pm.ROOT / "models" / "road_damage_5class_v8n.onnx"
+            _MODEL_CACHE["road"] = pm.YoloOnnx(path) if path.exists() else None
+        except Exception as exc:
+            print(f"road damage model not loaded ({exc}); using the older models", file=sys.stderr)
+            _MODEL_CACHE["road"] = None
+    return _MODEL_CACHE["road"]
+
+
+def detect_road_damage(bgr: np.ndarray, model, detect: tuple[str, ...], pothole_conf: float | None) -> list[Defect]:
+    cut = dict(ROAD_CONF) if pothole_conf is None else {**ROAD_CONF, "pothole": pothole_conf}
+    h, w = bgr.shape[:2]
+    defects = []
+    for d in model(bgr, conf=min(cut.values()), classes=None):
+        group = "crack" if d.kind.endswith("_crack") else d.kind
+        if group not in detect or d.confidence < cut[group]:
+            continue
+        area = d.bbox[2] * d.bbox[3]
+        frac = area / (h * w)
+        sev = "info" if group == "speed_bump" else "high" if frac > 0.04 else "medium" if frac > 0.01 else "low"
+        defects.append(Defect(d.kind, d.bbox, area_px=area, severity=sev, confidence=round(d.confidence, 3)))
+    return defects
+
+
 def pothole_model():
     """The trained YOLOv8 pothole model (models/pothole_1class.onnx), or None if it is not there."""
     if "model" not in _MODEL_CACHE:
@@ -606,14 +638,23 @@ def detect_potholes_model(bgr: np.ndarray, model, conf: float = 0.5) -> tuple[li
 
 
 def analyze(bgr: np.ndarray, roi_top: float = 0.0, road_only: bool = True, use_model: bool = True,
-            pothole_conf: float = 0.5, detect: tuple[str, ...] = ("pothole", "crack", "speed_bump"),
+            pothole_conf: float | None = None, detect: tuple[str, ...] = ("pothole", "crack", "speed_bump"),
             bump_conf: float = 0.5, **kw) -> tuple[list[Defect], np.ndarray]:
     """Run the detectors. roi_top: ignore the top fraction of the frame (sky, cars).
     road_only: only report cracks on the estimated road surface (not trees, buildings, cars).
-    use_model: find potholes with the trained model when models/pothole_1class.onnx exists.
+    use_model: use the trained models. models/road_damage_5class_v8n.onnx finds all types in one pass;
+    without it, the older pothole and speed bump models and the image rules below are used.
+    pothole_conf: pothole cut-off (default 0.25 for the road damage model, 0.5 for the older one).
     detect: which types to look for ("pothole", "crack", "speed_bump"). Speed bumps need
     models/road_anomaly_7class.onnx and are skipped without it."""
     y0 = int(roi_top * bgr.shape[0])
+    if use_model and road_model() is not None:
+        defects = detect_road_damage(bgr[y0:], road_model(), detect, pothole_conf)
+        for d in defects:
+            x, y, w, h = d.bbox
+            d.bbox = (x, y + y0, w, h)
+        return defects, annotate(bgr, defects, None, y0)
+    pothole_conf = 0.5 if pothole_conf is None else pothole_conf
     gray = preprocess(bgr[y0:])
     road = road_mask(bgr[y0:]) if road_only else np.full(gray.shape, 255, np.uint8)
     off_road = cv2.bitwise_not(road)

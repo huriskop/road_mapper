@@ -1,14 +1,41 @@
 # Trained models
 
-`vision_detector.py` uses two trained YOLOv8 models when their files are here:
+## Road damage model (used by default)
+
+`road_damage_5class_v8n.onnx` (12.8 MB, in git) finds longitudinal, transverse and alligator cracks,
+potholes and speed bumps in one pass. With it, the older models below are not needed.
+
+- YOLOv8n, 640 x 640, exported with opset 12; runs through OpenCV's DNN module (tested with 4.10 on the Pi 4)
+- 0.48 s per photo on a Raspberry Pi 4 (the older models and crack rules: 4.5 s)
+- A first version: 36 epochs (26 minutes) on 4,279 photos
+- SHA-256: `f0b0e4b28f5773571ae572a6fc6fc8ded0edc1f1fff7566705f300d1bc7d07ae`
+
+| Validation-chosen cut-off | pothole 0.25, crack 0.15, speed bump 0.15 |
+|---|---|
+| mAP50 on 1,135 unseen photos | pothole 0.58, longitudinal crack 0.42, transverse crack 0.35, alligator crack 0.54, speed bump 0.85 |
+
+The unseen photos come from the same sources as the training photos. The 40 photos in `test_images/real/`
+do not, and are the harder test. Known limits: close-up cracks are often missed or called potholes, and
+painted or worn humps can be missed. See the table in `test_images/evaluate.py`'s output.
+
+Training data:
+- [RDD2022](https://huggingface.co/datasets/cvtechniques/Road_Damage_Detection_USA) (Japan, India, USA, Czechia, China motorbike): cracks and potholes
+- [Speed breaker and rumbler dataset](https://huggingface.co/datasets/Aditya2302/speed-breaker-rumbler-dataset), CC-BY-4.0: speed bumps
+- [pothole_dataset_2](https://huggingface.co/datasets/rupesh002/pothole_dataset_2) (MIT), [Pothole-detection-Yolov8](https://huggingface.co/datasets/Ryukijano/Pothole-detection-Yolov8),
+  [pothole-segmentation](https://huggingface.co/datasets/keremberke/pothole-segmentation): close-up potholes
+
+Trained with [Ultralytics](https://github.com/ultralytics/ultralytics) YOLOv8, which is AGPL-3.0.
+
+## Older models (fallback)
+
+Without the model above, `vision_detector.py` uses these two YOLOv8 models when their files are here:
 
 | File | Used for | Size | Without it |
 |---|---|---|---|
 | `pothole_1class.onnx` | potholes | 45 MB | falls back to the rule-based pothole detector |
 | `road_anomaly_7class.onnx` | speed bumps (its other classes are ignored) | 99 MB | speed bumps are skipped |
 
-Cracks are found by the image rules in `vision_detector.py` and need no model.
-The files are too big for git, so they are not committed.
+Cracks are then found by the image rules in `vision_detector.py`. These files are too big for git.
 
 ## Download
 

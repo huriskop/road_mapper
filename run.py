@@ -83,7 +83,7 @@ class Monitor:
         self.store.update(item["id"], map={"id": inc["id"], "type": inc["defect_type"], "severity": inc["severity"],
                                            "location": source})
 
-    def check_photo(self, photo: bytes, detect: tuple[str, ...], conf: float, where: tuple[float, float] | None) -> dict:
+    def check_photo(self, photo: bytes, detect: tuple[str, ...], conf: float | None, where: tuple[float, float] | None) -> dict:
         """The photo test page: label one photo and, when a position is given, put it on the map."""
         if self.analyzer.vd is None:
             raise ValueError(self.analyzer.error)
@@ -185,7 +185,7 @@ class Handler(BaseHTTPRequestHandler):
             photo = self._raw()
             where = parse_location(f"{q['lat']},{q['lng']}") if "lat" in q and "lng" in q else None
             return self._json(MON.check_photo(photo, parse_detect(q.get("detect", ",".join(TYPES))),
-                                              float(q.get("conf", 0.5)), where))
+                                              float(q["conf"]) if "conf" in q else None, where))
         body = self._body()
         if path == "/api/trigger":
             t = MON.trigger
@@ -262,8 +262,8 @@ def main() -> None:
     ap.add_argument("--port", type=int, default=8080)
     ap.add_argument("--threshold", type=float, default=0.4, help="jolt that takes a photo, in g (gravity removed)")
     ap.add_argument("--detect", type=parse_detect, default=TYPES,
-                    help="what to look for (default pothole,crack,speed_bump; without speed_bump it is about 3x faster)")
-    ap.add_argument("--pothole-conf", type=float, default=0.5, help="pothole model confidence cut-off (0-1)")
+                    help="what to look for (default pothole,crack,speed_bump)")
+    ap.add_argument("--pothole-conf", type=float, help="pothole model confidence cut-off (0-1, default 0.25)")
     ap.add_argument("--fallback-location", type=parse_location, metavar="LAT,LNG",
                     help="position for jolts while the GPS has no fix")
     ap.add_argument("--roi", type=parse_roi, metavar="X0,Y0,X1,Y1", help="analyze only this part of each photo (fractions)")

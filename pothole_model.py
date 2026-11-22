@@ -17,6 +17,7 @@ import numpy as np
 ROOT = Path(__file__).resolve().parent
 MODELS = {
     # file name -> class names, in the order the model was trained with
+    "road_damage_5class_v8n.onnx": ["longitudinal_crack", "transverse_crack", "alligator_crack", "pothole", "speed_bump"],
     "pothole_1class.onnx": ["pothole"],
     "road_damage_5class.onnx": ["longitudinal_crack", "transverse_crack", "alligator_crack", "pothole", "other"],
     "road_anomaly_7class.onnx": ["heavy_vehicle", "light_vehicle", "pedestrian", "crack", "severe_crack",

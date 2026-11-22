@@ -1,8 +1,7 @@
 """Runs the camera detector (vision_detector.py) on photos, one at a time.
 
-Potholes: trained YOLOv8 model (models/pothole_1class.onnx). Speed bumps:
-models/road_anomaly_7class.onnx plus the painted-marking rules. Cracks: image rules.
-Without a model file, vision_detector falls back to its rules for that type.
+One trained YOLOv8n model (models/road_damage_5class_v8n.onnx) finds potholes, speed bumps and cracks.
+Without it, vision_detector falls back to the older models and image rules.
 
 A photo takes seconds on a Pi, so captures are analyzed in one background worker: the
 100 Hz sensor loop and the photo trigger never wait for it.
@@ -24,12 +23,12 @@ Roi = tuple[float, float, float, float]
 class Analyzer:
     """on_result(item) is called once for every capture, when its analysis has ended in any way."""
 
-    def __init__(self, store: CaptureStore, detect: tuple[str, ...] = TYPES, pothole_conf: float = 0.5,
+    def __init__(self, store: CaptureStore, detect: tuple[str, ...] = TYPES, pothole_conf: float | None = None,
                  threads: int = 3, roi: Roi | None = None, on_result=None) -> None:
         self.store, self.detect, self.conf, self.roi, self.on_result = store, detect, pothole_conf, roi, on_result
         self.error: str | None = None
         self.ready = False
-        self.models = {"pothole": False, "speed_bump": False}
+        self.models = {"pothole": False, "crack": False, "speed_bump": False}
         self.last_ms: int | None = None
         self.queue: queue.Queue = queue.Queue()
         self._lock = threading.Lock()                # the OpenCV networks are not thread-safe
@@ -72,9 +71,12 @@ class Analyzer:
     def _run(self) -> None:
         t0 = time.perf_counter()
         with self._lock:                             # load the models once, up front
-            self.models["pothole"] = self.vd.pothole_model() is not None
-            if "speed_bump" in self.detect:
-                self.models["speed_bump"] = self.vd.speed_bump_model() is not None
+            if self.vd.road_model() is not None:
+                self.models = dict.fromkeys(self.models, True)
+            else:
+                self.models["pothole"] = self.vd.pothole_model() is not None
+                if "speed_bump" in self.detect:
+                    self.models["speed_bump"] = self.vd.speed_bump_model() is not None
         self.ready = True
         print(f"detector ready in {time.perf_counter() - t0:.1f} s; models: {self.models}", flush=True)
         while True:
@@ -93,7 +95,7 @@ class Analyzer:
             except Exception as exc:
                 print(f"could not record capture {item_id}: {exc}", flush=True)
 
-    def analyze(self, photo: bytes, detect: tuple[str, ...], conf: float, roi: Roi | None = None) -> tuple[bytes, dict]:
+    def analyze(self, photo: bytes, detect: tuple[str, ...], conf: float | None, roi: Roi | None = None) -> tuple[bytes, dict]:
         """(labelled JPEG, result) for one photo."""
         cv2, np = self.cv2, self.np
         bgr = cv2.imdecode(np.frombuffer(photo, np.uint8), cv2.IMREAD_COLOR)
