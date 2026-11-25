@@ -1,0 +1,10 @@
+Open http://10.123.54.109:8080/   (Ctrl+C stops)
+detector ready in 0.2 s; models: {'pothole': True, 'crack': True, 'speed_bump': True}
+Open http://10.123.54.109:8080/   (Ctrl+C stops)
+detector ready in 0.1 s; models: {'pothole': True, 'crack': True, 'speed_bump': True}
+detecting: pothole
+detecting: pothole, speed_bump, crack
+detecting: speed_bump, crack
+detecting: speed_bump
+detecting: pothole, speed_bump
+detecting: pothole

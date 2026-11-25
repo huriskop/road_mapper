@@ -1,276 +1,61 @@
 [
  {
-  "id": "42e37c97-0d84-49e5-92e6-8fb8da4a8103",
+  "id": "d14fa0c6-d382-42ce-922f-0cd2b0f749ea",
   "repair_status": "awaiting_repair",
   "edited": [],
   "reports": [
    {
-    "time": "2026-11-25T06:14:27.773Z",
-    "lat": 37.4499105,
-    "lng": 126.65915783333334,
-    "image": "/captures/20261125-151428-083_down_labelled.jpg",
+    "time": "2026-11-25T06:27:58.762Z",
+    "lat": 37.44980366666667,
+    "lng": 126.65909483333334,
+    "image": "/captures/20261125-152759-074_down_labelled.jpg",
     "reason": "down",
     "location": "gps",
-    "peak_g": 0.9,
+    "peak_g": 1.09,
     "camera": {
      "status": "done",
-     "verdict": "pothole",
-     "potholes": 1,
+     "verdict": "speed_bump",
+     "potholes": 0,
      "speed_bumps": 1,
      "cracks": 0,
-     "pothole_confidence": 0.562,
-     "speed_bump_confidence": 0.43,
+     "pothole_confidence": null,
+     "speed_bump_confidence": 0.691,
      "defects": [
-      {
-       "kind": "pothole",
-       "severity": "high",
-       "confidence": 0.562
-      },
       {
        "kind": "speed_bump",
        "severity": "info",
-       "confidence": 0.43
+       "confidence": 0.691
       }
      ],
-     "time_ms": 4820,
+     "time_ms": 7078,
      "width": 640,
      "height": 480,
-     "seconds_before": 0.4,
-     "frames_checked": 9
-    }
-   },
-   {
-    "time": "2026-11-25T06:15:35.149Z",
-    "lat": 37.44995266666667,
-    "lng": 126.65916683333334,
-    "image": "/captures/20261125-151535-449_up_labelled.jpg",
-    "reason": "up",
-    "location": "gps",
-    "peak_g": 1.07,
-    "camera": {
-     "status": "done",
-     "verdict": "crack",
-     "potholes": 0,
-     "speed_bumps": 0,
-     "cracks": 1,
-     "pothole_confidence": null,
-     "speed_bump_confidence": null,
-     "defects": [
-      {
-       "kind": "alligator_crack",
-       "severity": "high",
-       "confidence": 0.403
-      }
-     ],
-     "time_ms": 6810,
-     "width": 640,
-     "height": 480,
-     "seconds_before": 0.5,
-     "frames_checked": 13
-    }
-   },
-   {
-    "time": "2026-11-25T06:15:38.269Z",
-    "lat": 37.44997083333333,
-    "lng": 126.65916450000002,
-    "image": "/captures/20261125-151538-580_up_labelled.jpg",
-    "reason": "up",
-    "location": "gps",
-    "peak_g": 0.58,
-    "camera": {
-     "status": "done",
-     "verdict": "crack",
-     "potholes": 0,
-     "speed_bumps": 0,
-     "cracks": 1,
-     "pothole_confidence": null,
-     "speed_bump_confidence": null,
-     "defects": [
-      {
-       "kind": "alligator_crack",
-       "severity": "high",
-       "confidence": 0.152
-      }
-     ],
-     "time_ms": 6807,
-     "width": 640,
-     "height": 480,
-     "seconds_before": 3.5,
+     "seconds_before": 4.5,
      "frames_checked": 13
     }
    }
   ],
-  "lat": 37.44994466666667,
-  "lng": 126.65916305555557,
-  "created_at": "2026-11-25T06:14:27.773Z",
-  "last_report_at": "2026-11-25T06:15:38.269Z",
-  "report_count": 3,
-  "peak_g": 1.07,
+  "lat": 37.44980366666667,
+  "lng": 126.65909483333334,
+  "created_at": "2026-11-25T06:27:58.762Z",
+  "last_report_at": "2026-11-25T06:27:58.762Z",
+  "report_count": 1,
+  "peak_g": 1.09,
   "severity": "high",
-  "defect_type": "pothole",
+  "defect_type": "bump",
   "type_source": "camera"
  },
  {
-  "id": "06787bbb-990b-491d-bd0c-9f01c8f11b3b",
+  "id": "87a90cff-da7c-41df-a529-511dc9daf466",
   "repair_status": "awaiting_repair",
   "edited": [],
   "reports": [
    {
-    "time": "2026-11-25T06:15:11.679Z",
-    "lat": 37.44980016666667,
-    "lng": 126.65915166666667,
-    "image": "/captures/20261125-151511-979_up_labelled.jpg",
+    "time": "2026-11-25T06:37:06.692Z",
+    "lat": 37.44975683333333,
+    "lng": 126.65901450000001,
+    "image": "/captures/20261125-153706-993_up_labelled.jpg",
     "reason": "up",
-    "location": "gps",
-    "peak_g": 0.42,
-    "camera": {
-     "status": "done",
-     "verdict": "speed_bump",
-     "potholes": 0,
-     "speed_bumps": 1,
-     "cracks": 0,
-     "pothole_confidence": null,
-     "speed_bump_confidence": 0.77,
-     "defects": [
-      {
-       "kind": "speed_bump",
-       "severity": "info",
-       "confidence": 0.77
-      }
-     ],
-     "time_ms": 6932,
-     "width": 640,
-     "height": 480,
-     "seconds_before": 2.5,
-     "frames_checked": 13
-    }
-   },
-   {
-    "time": "2026-11-25T06:15:14.909Z",
-    "lat": 37.44980116666667,
-    "lng": 126.65916066666665,
-    "image": "/captures/20261125-151515-210_up_labelled.jpg",
-    "reason": "up",
-    "location": "gps",
-    "peak_g": 0.59,
-    "camera": {
-     "status": "done",
-     "verdict": "speed_bump",
-     "potholes": 0,
-     "speed_bumps": 1,
-     "cracks": 0,
-     "pothole_confidence": null,
-     "speed_bump_confidence": 0.77,
-     "defects": [
-      {
-       "kind": "speed_bump",
-       "severity": "info",
-       "confidence": 0.77
-      }
-     ],
-     "time_ms": 6844,
-     "width": 640,
-     "height": 480,
-     "seconds_before": 6.0,
-     "frames_checked": 13
-    }
-   },
-   {
-    "time": "2026-11-25T06:15:16.909Z",
-    "lat": 37.44980933333333,
-    "lng": 126.659177,
-    "image": "/captures/20261125-151517-219_up_labelled.jpg",
-    "reason": "up",
-    "location": "gps",
-    "peak_g": 0.43,
-    "camera": {
-     "status": "done",
-     "verdict": "speed_bump",
-     "potholes": 0,
-     "speed_bumps": 1,
-     "cracks": 0,
-     "pothole_confidence": null,
-     "speed_bump_confidence": 0.718,
-     "defects": [
-      {
-       "kind": "speed_bump",
-       "severity": "info",
-       "confidence": 0.718
-      }
-     ],
-     "time_ms": 6688,
-     "width": 640,
-     "height": 480,
-     "seconds_before": 6.0,
-     "frames_checked": 13
-    }
-   },
-   {
-    "time": "2026-11-25T06:16:14.898Z",
-    "lat": 37.4497795,
-    "lng": 126.65916633333333,
-    "image": "/captures/20261125-151615-209_up_labelled.jpg",
-    "reason": "up",
-    "location": "gps",
-    "peak_g": 0.49,
-    "camera": {
-     "status": "done",
-     "verdict": "pothole",
-     "potholes": 1,
-     "speed_bumps": 0,
-     "cracks": 0,
-     "pothole_confidence": 0.61,
-     "speed_bump_confidence": null,
-     "defects": [
-      {
-       "kind": "pothole",
-       "severity": "medium",
-       "confidence": 0.61
-      }
-     ],
-     "time_ms": 6684,
-     "width": 640,
-     "height": 480,
-     "seconds_before": 5.5,
-     "frames_checked": 13
-    }
-   },
-   {
-    "time": "2026-11-25T06:16:25.748Z",
-    "lat": 37.449778,
-    "lng": 126.65914833333333,
-    "image": "/captures/20261125-151626-059_up_labelled.jpg",
-    "reason": "up",
-    "location": "gps",
-    "peak_g": 0.73,
-    "camera": {
-     "status": "done",
-     "verdict": "speed_bump",
-     "potholes": 0,
-     "speed_bumps": 1,
-     "cracks": 0,
-     "pothole_confidence": null,
-     "speed_bump_confidence": 0.713,
-     "defects": [
-      {
-       "kind": "speed_bump",
-       "severity": "info",
-       "confidence": 0.713
-      }
-     ],
-     "time_ms": 6754,
-     "width": 640,
-     "height": 480,
-     "seconds_before": 1.0,
-     "frames_checked": 13
-    }
-   },
-   {
-    "time": "2026-11-25T06:16:28.249Z",
-    "lat": 37.44978783333333,
-    "lng": 126.65919549999998,
-    "image": "/captures/20261125-151628-550_down_labelled.jpg",
-    "reason": "down",
     "location": "gps",
     "peak_g": 0.6,
     "camera": {
@@ -280,15 +65,45 @@
      "speed_bumps": 1,
      "cracks": 0,
      "pothole_confidence": null,
-     "speed_bump_confidence": 0.746,
+     "speed_bump_confidence": 0.305,
      "defects": [
       {
        "kind": "speed_bump",
        "severity": "info",
-       "confidence": 0.746
+       "confidence": 0.305
       }
      ],
-     "time_ms": 6590,
+     "time_ms": 6851,
+     "width": 640,
+     "height": 480,
+     "seconds_before": 1.0,
+     "frames_checked": 13
+    }
+   },
+   {
+    "time": "2026-11-25T06:37:20.462Z",
+    "lat": 37.449775,
+    "lng": 126.65900983333334,
+    "image": "/captures/20261125-153720-772_up_labelled.jpg",
+    "reason": "up",
+    "location": "gps",
+    "peak_g": 2.08,
+    "camera": {
+     "status": "done",
+     "verdict": "speed_bump",
+     "potholes": 0,
+     "speed_bumps": 1,
+     "cracks": 0,
+     "pothole_confidence": null,
+     "speed_bump_confidence": 0.83,
+     "defects": [
+      {
+       "kind": "speed_bump",
+       "severity": "info",
+       "confidence": 0.83
+      }
+     ],
+     "time_ms": 6863,
      "width": 640,
      "height": 480,
      "seconds_before": 0.5,
@@ -296,118 +111,260 @@
     }
    }
   ],
-  "lat": 37.44979266666667,
-  "lng": 126.65916658333333,
-  "created_at": "2026-11-25T06:15:11.679Z",
-  "last_report_at": "2026-11-25T06:16:28.249Z",
-  "report_count": 6,
-  "peak_g": 0.73,
-  "severity": "medium",
+  "lat": 37.449765916666664,
+  "lng": 126.65901216666668,
+  "created_at": "2026-11-25T06:37:06.692Z",
+  "last_report_at": "2026-11-25T06:37:20.462Z",
+  "report_count": 2,
+  "peak_g": 2.08,
+  "severity": "critical",
   "defect_type": "bump",
   "type_source": "camera"
  },
  {
-  "id": "44c75693-7783-45b7-9be4-4538cadd18c9",
+  "id": "04b0ff63-cc79-4fe3-a37f-3d5f4f58c99c",
   "repair_status": "awaiting_repair",
   "edited": [],
   "reports": [
    {
-    "time": "2026-11-25T06:15:41.089Z",
-    "lat": 37.449900166666666,
-    "lng": 126.65918383333334,
-    "image": "/captures/20261125-151541-390_up_labelled.jpg",
-    "reason": "up",
+    "time": "2026-11-25T06:37:24.212Z",
+    "lat": 37.449841666666664,
+    "lng": 126.65904083333335,
+    "image": "/captures/20261125-153724-515_down_labelled.jpg",
+    "reason": "down",
     "location": "gps",
-    "peak_g": 0.42,
+    "peak_g": 0.8,
     "camera": {
      "status": "done",
-     "verdict": "crack",
+     "verdict": "speed_bump",
      "potholes": 0,
-     "speed_bumps": 0,
-     "cracks": 1,
+     "speed_bumps": 1,
+     "cracks": 0,
      "pothole_confidence": null,
-     "speed_bump_confidence": null,
+     "speed_bump_confidence": 0.669,
      "defects": [
       {
-       "kind": "alligator_crack",
-       "severity": "high",
-       "confidence": 0.209
+       "kind": "speed_bump",
+       "severity": "info",
+       "confidence": 0.669
       }
      ],
-     "time_ms": 6836,
+     "time_ms": 6810,
      "width": 640,
      "height": 480,
      "seconds_before": 4.5,
      "frames_checked": 13
     }
+   },
+   {
+    "time": "2026-11-25T06:37:39.412Z",
+    "lat": 37.4498485,
+    "lng": 126.65898983333334,
+    "image": "/captures/20261125-153739-722_up_labelled.jpg",
+    "reason": "up",
+    "location": "gps",
+    "peak_g": 1.92,
+    "camera": {
+     "status": "done",
+     "verdict": "speed_bump",
+     "potholes": 0,
+     "speed_bumps": 1,
+     "cracks": 0,
+     "pothole_confidence": null,
+     "speed_bump_confidence": 0.654,
+     "defects": [
+      {
+       "kind": "speed_bump",
+       "severity": "info",
+       "confidence": 0.654
+      }
+     ],
+     "time_ms": 6897,
+     "width": 640,
+     "height": 480,
+     "seconds_before": 1.0,
+     "frames_checked": 13
+    }
+   },
+   {
+    "time": "2026-11-25T06:43:28.366Z",
+    "lat": 37.4498185,
+    "lng": 126.65904133333333,
+    "image": "/captures/20261125-154328-667_up.jpg",
+    "reason": "up",
+    "location": "gps",
+    "peak_g": 0.98,
+    "camera": null
    }
   ],
-  "lat": 37.449900166666666,
-  "lng": 126.65918383333334,
-  "created_at": "2026-11-25T06:15:41.089Z",
-  "last_report_at": "2026-11-25T06:15:41.089Z",
-  "report_count": 1,
-  "peak_g": 0.42,
-  "severity": "low",
+  "lat": 37.449836222222224,
+  "lng": 126.659024,
+  "created_at": "2026-11-25T06:37:24.212Z",
+  "last_report_at": "2026-11-25T06:43:28.366Z",
+  "report_count": 3,
+  "peak_g": 1.92,
+  "severity": "critical",
   "defect_type": "bump",
-  "type_source": "sensor"
+  "type_source": "camera"
  },
  {
-  "id": "08ac2560-2b55-4924-8596-1efa8512b11f",
+  "id": "373f0424-4820-415f-ab75-6e718ad1cae1",
   "repair_status": "awaiting_repair",
   "edited": [],
   "reports": [
    {
-    "time": "2026-11-25T06:16:02.509Z",
-    "lat": 37.449716333333335,
-    "lng": 126.65926216666666,
-    "image": "/captures/20261125-151602-810_down_labelled.jpg",
-    "reason": "down",
+    "time": "2026-11-25T06:37:27.802Z",
+    "lat": 37.4499305,
+    "lng": 126.65910133333334,
+    "image": "/captures/20261125-153728-104_up_labelled.jpg",
+    "reason": "up",
     "location": "gps",
     "peak_g": 0.41,
     "camera": {
      "status": "done",
-     "verdict": "pothole",
-     "potholes": 1,
+     "verdict": "none",
+     "potholes": 0,
      "speed_bumps": 0,
      "cracks": 0,
-     "pothole_confidence": 0.617,
+     "pothole_confidence": null,
      "speed_bump_confidence": null,
-     "defects": [
-      {
-       "kind": "pothole",
-       "severity": "high",
-       "confidence": 0.617
-      }
-     ],
-     "time_ms": 6850,
+     "defects": [],
+     "time_ms": 6814,
      "width": 640,
      "height": 480,
-     "seconds_before": 2.0,
+     "seconds_before": 0.0,
+     "frames_checked": 13
+    }
+   },
+   {
+    "time": "2026-11-25T06:37:30.091Z",
+    "lat": 37.449917,
+    "lng": 126.65911333333334,
+    "image": "/captures/20261125-153730-392_up_labelled.jpg",
+    "reason": "up",
+    "location": "gps",
+    "peak_g": 0.54,
+    "camera": {
+     "status": "done",
+     "verdict": "speed_bump",
+     "potholes": 0,
+     "speed_bumps": 1,
+     "cracks": 0,
+     "pothole_confidence": null,
+     "speed_bump_confidence": 0.285,
+     "defects": [
+      {
+       "kind": "speed_bump",
+       "severity": "info",
+       "confidence": 0.285
+      }
+     ],
+     "time_ms": 7043,
+     "width": 640,
+     "height": 480,
+     "seconds_before": 4.0,
+     "frames_checked": 13
+    }
+   },
+   {
+    "time": "2026-11-25T06:37:32.472Z",
+    "lat": 37.44991916666667,
+    "lng": 126.65908183333335,
+    "image": "/captures/20261125-153732-772_up_labelled.jpg",
+    "reason": "up",
+    "location": "gps",
+    "peak_g": 0.58,
+    "camera": {
+     "status": "done",
+     "verdict": "none",
+     "potholes": 0,
+     "speed_bumps": 0,
+     "cracks": 0,
+     "pothole_confidence": null,
+     "speed_bump_confidence": null,
+     "defects": [],
+     "time_ms": 6905,
+     "width": 640,
+     "height": 480,
+     "seconds_before": 0.0,
+     "frames_checked": 13
+    }
+   },
+   {
+    "time": "2026-11-25T06:43:17.108Z",
+    "lat": 37.449925,
+    "lng": 126.65907250000001,
+    "image": "/captures/20261125-154317-417_up_labelled.jpg",
+    "reason": "up",
+    "location": "gps",
+    "peak_g": 1.02,
+    "camera": {
+     "status": "done",
+     "verdict": "none",
+     "potholes": 0,
+     "speed_bumps": 0,
+     "cracks": 0,
+     "pothole_confidence": null,
+     "speed_bump_confidence": null,
+     "defects": [],
+     "time_ms": 6828,
+     "width": 640,
+     "height": 480,
+     "seconds_before": 0.0,
+     "frames_checked": 13
+    }
+   },
+   {
+    "time": "2026-11-25T06:43:19.456Z",
+    "lat": 37.44990833333333,
+    "lng": 126.659067,
+    "image": "/captures/20261125-154319-767_up_labelled.jpg",
+    "reason": "up",
+    "location": "gps",
+    "peak_g": 1.15,
+    "camera": {
+     "status": "done",
+     "verdict": "speed_bump",
+     "potholes": 0,
+     "speed_bumps": 1,
+     "cracks": 0,
+     "pothole_confidence": null,
+     "speed_bump_confidence": 0.261,
+     "defects": [
+      {
+       "kind": "speed_bump",
+       "severity": "info",
+       "confidence": 0.261
+      }
+     ],
+     "time_ms": 6884,
+     "width": 640,
+     "height": 480,
+     "seconds_before": 0.5,
      "frames_checked": 13
     }
    }
   ],
-  "lat": 37.449716333333335,
-  "lng": 126.65926216666666,
-  "created_at": "2026-11-25T06:16:02.509Z",
-  "last_report_at": "2026-11-25T06:16:02.509Z",
-  "report_count": 1,
-  "peak_g": 0.41,
-  "severity": "low",
-  "defect_type": "pothole",
+  "lat": 37.44992,
+  "lng": 126.6590872,
+  "created_at": "2026-11-25T06:37:27.802Z",
+  "last_report_at": "2026-11-25T06:43:19.456Z",
+  "report_count": 5,
+  "peak_g": 1.15,
+  "severity": "high",
+  "defect_type": "bump",
   "type_source": "camera"
  },
  {
-  "id": "c367d353-ab64-4e36-a339-5ac5d32f6c84",
+  "id": "a0f76359-f4d2-4f34-a73c-dada7a7dfe79",
   "repair_status": "awaiting_repair",
   "edited": [],
   "reports": [
    {
-    "time": "2026-11-25T06:20:42.709Z",
-    "lat": 37.44969233333334,
-    "lng": 126.65916933333334,
-    "image": "/captures/20261125-152043-019_up_labelled.jpg",
+    "time": "2026-11-25T06:37:36.192Z",
+    "lat": 37.4498775,
+    "lng": 126.65908766666668,
+    "image": "/captures/20261125-153736-492_up_labelled.jpg",
     "reason": "up",
     "location": "gps",
     "peak_g": 0.69,
@@ -420,7 +377,7 @@
      "pothole_confidence": null,
      "speed_bump_confidence": null,
      "defects": [],
-     "time_ms": 6860,
+     "time_ms": 6930,
      "width": 640,
      "height": 480,
      "seconds_before": 0.0,
@@ -428,13 +385,13 @@
     }
    },
    {
-    "time": "2026-11-25T06:20:44.939Z",
-    "lat": 37.449699499999994,
-    "lng": 126.65916266666666,
-    "image": "/captures/20261125-152045-239_down_labelled.jpg",
-    "reason": "down",
+    "time": "2026-11-25T06:43:24.456Z",
+    "lat": 37.44985616666667,
+    "lng": 126.65910083333334,
+    "image": "/captures/20261125-154324-765_up_labelled.jpg",
+    "reason": "up",
     "location": "gps",
-    "peak_g": 0.46,
+    "peak_g": 2.27,
     "camera": {
      "status": "done",
      "verdict": "speed_bump",
@@ -442,15 +399,275 @@
      "speed_bumps": 1,
      "cracks": 0,
      "pothole_confidence": null,
-     "speed_bump_confidence": 0.495,
+     "speed_bump_confidence": 0.714,
      "defects": [
       {
        "kind": "speed_bump",
        "severity": "info",
-       "confidence": 0.495
+       "confidence": 0.714
       }
      ],
-     "time_ms": 6739,
+     "time_ms": 6750,
+     "width": 640,
+     "height": 480,
+     "seconds_before": 1.0,
+     "frames_checked": 13
+    }
+   }
+  ],
+  "lat": 37.44986683333333,
+  "lng": 126.65909425000001,
+  "created_at": "2026-11-25T06:37:36.192Z",
+  "last_report_at": "2026-11-25T06:43:24.456Z",
+  "report_count": 2,
+  "peak_g": 2.27,
+  "severity": "critical",
+  "defect_type": "bump",
+  "type_source": "camera"
+ },
+ {
+  "id": "4156ae4b-a850-4da8-b951-a150d93d6670",
+  "repair_status": "awaiting_repair",
+  "edited": [],
+  "reports": [
+   {
+    "time": "2026-11-25T06:42:52.624Z",
+    "lat": 37.449787,
+    "lng": 126.65915966666668,
+    "image": "/captures/20261125-154252-924_up_labelled.jpg",
+    "reason": "up",
+    "location": "gps",
+    "peak_g": 1.13,
+    "camera": {
+     "status": "done",
+     "verdict": "none",
+     "potholes": 0,
+     "speed_bumps": 0,
+     "cracks": 0,
+     "pothole_confidence": null,
+     "speed_bump_confidence": null,
+     "defects": [],
+     "time_ms": 6799,
+     "width": 640,
+     "height": 480,
+     "seconds_before": 0.0,
+     "frames_checked": 13
+    }
+   },
+   {
+    "time": "2026-11-25T06:42:57.414Z",
+    "lat": 37.449776166666666,
+    "lng": 126.65913483333334,
+    "image": "/captures/20261125-154257-715_up_labelled.jpg",
+    "reason": "up",
+    "location": "gps",
+    "peak_g": 0.54,
+    "camera": {
+     "status": "done",
+     "verdict": "speed_bump",
+     "potholes": 0,
+     "speed_bumps": 1,
+     "cracks": 0,
+     "pothole_confidence": null,
+     "speed_bump_confidence": 0.625,
+     "defects": [
+      {
+       "kind": "speed_bump",
+       "severity": "info",
+       "confidence": 0.625
+      }
+     ],
+     "time_ms": 6977,
+     "width": 640,
+     "height": 480,
+     "seconds_before": 5.5,
+     "frames_checked": 13
+    }
+   },
+   {
+    "time": "2026-11-25T06:42:59.684Z",
+    "lat": 37.44976016666667,
+    "lng": 126.65912666666667,
+    "image": "/captures/20261125-154259-985_up_labelled.jpg",
+    "reason": "up",
+    "location": "gps",
+    "peak_g": 1.5,
+    "camera": {
+     "status": "done",
+     "verdict": "speed_bump",
+     "potholes": 0,
+     "speed_bumps": 1,
+     "cracks": 0,
+     "pothole_confidence": null,
+     "speed_bump_confidence": 0.36,
+     "defects": [
+      {
+       "kind": "speed_bump",
+       "severity": "info",
+       "confidence": 0.36
+      }
+     ],
+     "time_ms": 6896,
+     "width": 640,
+     "height": 480,
+     "seconds_before": 1.0,
+     "frames_checked": 13
+    }
+   },
+   {
+    "time": "2026-11-25T06:43:09.744Z",
+    "lat": 37.4497735,
+    "lng": 126.65912099999998,
+    "image": "/captures/20261125-154310-056_up_labelled.jpg",
+    "reason": "up",
+    "location": "gps",
+    "peak_g": 2.23,
+    "camera": {
+     "status": "done",
+     "verdict": "speed_bump",
+     "potholes": 0,
+     "speed_bumps": 1,
+     "cracks": 0,
+     "pothole_confidence": null,
+     "speed_bump_confidence": 0.687,
+     "defects": [
+      {
+       "kind": "speed_bump",
+       "severity": "info",
+       "confidence": 0.687
+      }
+     ],
+     "time_ms": 6881,
+     "width": 640,
+     "height": 480,
+     "seconds_before": 1.0,
+     "frames_checked": 13
+    }
+   },
+   {
+    "time": "2026-11-25T06:47:46.719Z",
+    "lat": 37.44975483333334,
+    "lng": 126.65915483333335,
+    "image": "/captures/20261125-154747-029_down_labelled.jpg",
+    "reason": "down",
+    "location": "gps",
+    "peak_g": 0.58,
+    "camera": {
+     "status": "done",
+     "verdict": "pothole",
+     "potholes": 1,
+     "speed_bumps": 0,
+     "cracks": 0,
+     "pothole_confidence": 0.324,
+     "speed_bump_confidence": null,
+     "defects": [
+      {
+       "kind": "pothole",
+       "severity": "high",
+       "confidence": 0.324
+      }
+     ],
+     "time_ms": 6640,
+     "width": 640,
+     "height": 480,
+     "seconds_before": 4.5,
+     "frames_checked": 13
+    }
+   }
+  ],
+  "lat": 37.44977033333333,
+  "lng": 126.6591394,
+  "created_at": "2026-11-25T06:42:52.624Z",
+  "last_report_at": "2026-11-25T06:47:46.719Z",
+  "report_count": 5,
+  "peak_g": 2.23,
+  "severity": "critical",
+  "defect_type": "bump",
+  "type_source": "camera"
+ },
+ {
+  "id": "b628ab50-9a9c-4ce5-9db6-a9e0ab46d0e1",
+  "repair_status": "awaiting_repair",
+  "edited": [],
+  "reports": [
+   {
+    "time": "2026-11-25T06:43:04.914Z",
+    "lat": 37.449709666666664,
+    "lng": 126.65908316666668,
+    "image": "/captures/20261125-154305-215_up_labelled.jpg",
+    "reason": "up",
+    "location": "gps",
+    "peak_g": 1.17,
+    "camera": {
+     "status": "done",
+     "verdict": "none",
+     "potholes": 0,
+     "speed_bumps": 0,
+     "cracks": 0,
+     "pothole_confidence": null,
+     "speed_bump_confidence": null,
+     "defects": [],
+     "time_ms": 6788,
+     "width": 640,
+     "height": 480,
+     "seconds_before": 0.0,
+     "frames_checked": 13
+    }
+   },
+   {
+    "time": "2026-11-25T06:43:07.564Z",
+    "lat": 37.44973933333333,
+    "lng": 126.65909716666665,
+    "image": "/captures/20261125-154307-865_up_labelled.jpg",
+    "reason": "up",
+    "location": "gps",
+    "peak_g": 0.75,
+    "camera": {
+     "status": "done",
+     "verdict": "speed_bump",
+     "potholes": 0,
+     "speed_bumps": 1,
+     "cracks": 0,
+     "pothole_confidence": null,
+     "speed_bump_confidence": 0.162,
+     "defects": [
+      {
+       "kind": "speed_bump",
+       "severity": "info",
+       "confidence": 0.162
+      }
+     ],
+     "time_ms": 6985,
+     "width": 640,
+     "height": 480,
+     "seconds_before": 0.4,
+     "frames_checked": 13
+    }
+   },
+   {
+    "time": "2026-11-25T06:47:42.389Z",
+    "lat": 37.44973616666667,
+    "lng": 126.65913333333334,
+    "image": "/captures/20261125-154742-689_up_labelled.jpg",
+    "reason": "up",
+    "location": "gps",
+    "peak_g": 3.9,
+    "camera": {
+     "status": "done",
+     "verdict": "pothole",
+     "potholes": 1,
+     "speed_bumps": 0,
+     "cracks": 0,
+     "pothole_confidence": 0.31,
+     "speed_bump_confidence": null,
+     "defects": [
+      {
+       "kind": "pothole",
+       "severity": "high",
+       "confidence": 0.31
+      }
+     ],
+     "time_ms": 6533,
      "width": 640,
      "height": 480,
      "seconds_before": 0.0,
@@ -458,14 +675,1119 @@
     }
    }
   ],
-  "lat": 37.44969591666667,
-  "lng": 126.659166,
-  "created_at": "2026-11-25T06:20:42.709Z",
-  "last_report_at": "2026-11-25T06:20:44.939Z",
-  "report_count": 2,
-  "peak_g": 0.69,
-  "severity": "medium",
+  "lat": 37.44972838888889,
+  "lng": 126.65910455555554,
+  "created_at": "2026-11-25T06:43:04.914Z",
+  "last_report_at": "2026-11-25T06:47:42.389Z",
+  "report_count": 3,
+  "peak_g": 3.9,
+  "severity": "critical",
   "defect_type": "bump",
+  "type_source": "camera"
+ },
+ {
+  "id": "975704b3-f51c-4ef1-9f37-96bcbca3fe10",
+  "repair_status": "awaiting_repair",
+  "edited": [],
+  "reports": [
+   {
+    "time": "2026-11-25T06:48:33.249Z",
+    "lat": 37.44968466666667,
+    "lng": 126.6587905,
+    "image": "/captures/20261125-154833-549_up_labelled.jpg",
+    "reason": "up",
+    "location": "gps",
+    "peak_g": 1.16,
+    "camera": {
+     "status": "done",
+     "verdict": "pothole",
+     "potholes": 1,
+     "speed_bumps": 0,
+     "cracks": 0,
+     "pothole_confidence": 0.362,
+     "speed_bump_confidence": null,
+     "defects": [
+      {
+       "kind": "pothole",
+       "severity": "low",
+       "confidence": 0.362
+      }
+     ],
+     "time_ms": 6519,
+     "width": 640,
+     "height": 480,
+     "seconds_before": 3.5,
+     "frames_checked": 13
+    }
+   }
+  ],
+  "lat": 37.44968466666667,
+  "lng": 126.6587905,
+  "created_at": "2026-11-25T06:48:33.249Z",
+  "last_report_at": "2026-11-25T06:48:33.249Z",
+  "report_count": 1,
+  "peak_g": 1.16,
+  "severity": "high",
+  "defect_type": "pothole",
+  "type_source": "camera"
+ },
+ {
+  "id": "bab2c2bf-5539-45ce-b30d-bc48e77d426b",
+  "repair_status": "awaiting_repair",
+  "edited": [],
+  "reports": [
+   {
+    "time": "2026-11-25T06:49:30.069Z",
+    "lat": 37.44920183333333,
+    "lng": 126.65844833333334,
+    "image": "/captures/20261125-154930-370_up_labelled.jpg",
+    "reason": "up",
+    "location": "gps",
+    "peak_g": 0.82,
+    "camera": {
+     "status": "done",
+     "verdict": "pothole",
+     "potholes": 1,
+     "speed_bumps": 0,
+     "cracks": 0,
+     "pothole_confidence": 0.334,
+     "speed_bump_confidence": null,
+     "defects": [
+      {
+       "kind": "pothole",
+       "severity": "high",
+       "confidence": 0.334
+      }
+     ],
+     "time_ms": 6516,
+     "width": 640,
+     "height": 480,
+     "seconds_before": 0.0,
+     "frames_checked": 13
+    }
+   },
+   {
+    "time": "2026-11-25T07:01:26.359Z",
+    "lat": 37.4492215,
+    "lng": 126.65840716666668,
+    "image": "/captures/20261125-160126-662_down.jpg",
+    "reason": "down",
+    "location": "gps",
+    "peak_g": 0.84,
+    "camera": null
+   }
+  ],
+  "lat": 37.44921166666667,
+  "lng": 126.65842775000002,
+  "created_at": "2026-11-25T06:49:30.069Z",
+  "last_report_at": "2026-11-25T07:01:26.359Z",
+  "report_count": 2,
+  "peak_g": 0.84,
+  "severity": "medium",
+  "defect_type": "pothole",
+  "type_source": "camera"
+ },
+ {
+  "id": "c20450cc-7b8c-47c0-90e1-efadff6406a0",
+  "repair_status": "awaiting_repair",
+  "edited": [],
+  "reports": [
+   {
+    "time": "2026-11-25T06:49:38.193Z",
+    "lat": 37.44911166666667,
+    "lng": 126.6584605,
+    "image": "/captures/20261125-154938-500_up_labelled.jpg",
+    "reason": "up",
+    "location": "gps",
+    "peak_g": 1.02,
+    "camera": {
+     "status": "done",
+     "verdict": "pothole",
+     "potholes": 1,
+     "speed_bumps": 0,
+     "cracks": 0,
+     "pothole_confidence": 0.543,
+     "speed_bump_confidence": null,
+     "defects": [
+      {
+       "kind": "pothole",
+       "severity": "high",
+       "confidence": 0.543
+      }
+     ],
+     "time_ms": 6565,
+     "width": 640,
+     "height": 480,
+     "seconds_before": 4.0,
+     "frames_checked": 13
+    }
+   }
+  ],
+  "lat": 37.44911166666667,
+  "lng": 126.6584605,
+  "created_at": "2026-11-25T06:49:38.193Z",
+  "last_report_at": "2026-11-25T06:49:38.193Z",
+  "report_count": 1,
+  "peak_g": 1.02,
+  "severity": "high",
+  "defect_type": "pothole",
+  "type_source": "camera"
+ },
+ {
+  "id": "ac1a1d2c-eebc-4e10-b5ef-39a35f2a92b8",
+  "repair_status": "awaiting_repair",
+  "edited": [],
+  "reports": [
+   {
+    "time": "2026-11-25T06:51:51.329Z",
+    "lat": 37.44919016666667,
+    "lng": 126.65825699999999,
+    "image": "/captures/20261125-155151-639_up_labelled.jpg",
+    "reason": "up",
+    "location": "gps",
+    "peak_g": 0.65,
+    "camera": {
+     "status": "done",
+     "verdict": "pothole",
+     "potholes": 1,
+     "speed_bumps": 0,
+     "cracks": 0,
+     "pothole_confidence": 0.527,
+     "speed_bump_confidence": null,
+     "defects": [
+      {
+       "kind": "pothole",
+       "severity": "high",
+       "confidence": 0.527
+      }
+     ],
+     "time_ms": 6515,
+     "width": 640,
+     "height": 480,
+     "seconds_before": 3.0,
+     "frames_checked": 13
+    }
+   },
+   {
+    "time": "2026-11-25T06:53:22.479Z",
+    "lat": 37.44918583333333,
+    "lng": 126.65824616666666,
+    "image": "/captures/20261125-155322-790_up_labelled.jpg",
+    "reason": "up",
+    "location": "gps",
+    "peak_g": 1.82,
+    "camera": {
+     "status": "done",
+     "verdict": "pothole",
+     "potholes": 1,
+     "speed_bumps": 0,
+     "cracks": 0,
+     "pothole_confidence": 0.364,
+     "speed_bump_confidence": null,
+     "defects": [
+      {
+       "kind": "pothole",
+       "severity": "high",
+       "confidence": 0.364
+      }
+     ],
+     "time_ms": 6600,
+     "width": 640,
+     "height": 480,
+     "seconds_before": 0.0,
+     "frames_checked": 13
+    }
+   },
+   {
+    "time": "2026-11-25T06:53:25.690Z",
+    "lat": 37.4492195,
+    "lng": 126.65823333333334,
+    "image": "/captures/20261125-155326-000_up_labelled.jpg",
+    "reason": "up",
+    "location": "gps",
+    "peak_g": 1.68,
+    "camera": {
+     "status": "done",
+     "verdict": "pothole",
+     "potholes": 1,
+     "speed_bumps": 0,
+     "cracks": 0,
+     "pothole_confidence": 0.859,
+     "speed_bump_confidence": null,
+     "defects": [
+      {
+       "kind": "pothole",
+       "severity": "high",
+       "confidence": 0.859
+      }
+     ],
+     "time_ms": 6637,
+     "width": 640,
+     "height": 480,
+     "seconds_before": 4.0,
+     "frames_checked": 13
+    }
+   }
+  ],
+  "lat": 37.4491985,
+  "lng": 126.6582455,
+  "created_at": "2026-11-25T06:51:51.329Z",
+  "last_report_at": "2026-11-25T06:53:25.690Z",
+  "report_count": 3,
+  "peak_g": 1.82,
+  "severity": "critical",
+  "defect_type": "pothole",
+  "type_source": "camera"
+ },
+ {
+  "id": "8d4ba932-e2cc-4cb0-9ab9-dafa5c0d608c",
+  "repair_status": "awaiting_repair",
+  "edited": [],
+  "reports": [
+   {
+    "time": "2026-11-25T06:52:13.610Z",
+    "lat": 37.4490165,
+    "lng": 126.6581765,
+    "image": "/captures/20261125-155213-910_up_labelled.jpg",
+    "reason": "up",
+    "location": "gps",
+    "peak_g": 2.36,
+    "camera": {
+     "status": "done",
+     "verdict": "pothole",
+     "potholes": 2,
+     "speed_bumps": 0,
+     "cracks": 0,
+     "pothole_confidence": 0.642,
+     "speed_bump_confidence": null,
+     "defects": [
+      {
+       "kind": "pothole",
+       "severity": "high",
+       "confidence": 0.642
+      },
+      {
+       "kind": "pothole",
+       "severity": "medium",
+       "confidence": 0.272
+      }
+     ],
+     "time_ms": 6590,
+     "width": 640,
+     "height": 480,
+     "seconds_before": 4.5,
+     "frames_checked": 13
+    }
+   }
+  ],
+  "lat": 37.4490165,
+  "lng": 126.6581765,
+  "created_at": "2026-11-25T06:52:13.610Z",
+  "last_report_at": "2026-11-25T06:52:13.610Z",
+  "report_count": 1,
+  "peak_g": 2.36,
+  "severity": "critical",
+  "defect_type": "pothole",
+  "type_source": "camera"
+ },
+ {
+  "id": "7d7b9f7d-bede-4443-b09c-0d70cadece29",
+  "repair_status": "awaiting_repair",
+  "edited": [],
+  "reports": [
+   {
+    "time": "2026-11-25T06:53:32.470Z",
+    "lat": 37.449272666666666,
+    "lng": 126.65822066666667,
+    "image": "/captures/20261125-155332-780_up_labelled.jpg",
+    "reason": "up",
+    "location": "gps",
+    "peak_g": 0.57,
+    "camera": {
+     "status": "done",
+     "verdict": "pothole",
+     "potholes": 2,
+     "speed_bumps": 0,
+     "cracks": 0,
+     "pothole_confidence": 0.505,
+     "speed_bump_confidence": null,
+     "defects": [
+      {
+       "kind": "pothole",
+       "severity": "low",
+       "confidence": 0.505
+      },
+      {
+       "kind": "pothole",
+       "severity": "low",
+       "confidence": 0.274
+      }
+     ],
+     "time_ms": 6456,
+     "width": 640,
+     "height": 480,
+     "seconds_before": 2.0,
+     "frames_checked": 13
+    }
+   },
+   {
+    "time": "2026-11-25T07:02:29.351Z",
+    "lat": 37.449304,
+    "lng": 126.65823216666668,
+    "image": "/captures/20261125-160229-652_up_labelled.jpg",
+    "reason": "up",
+    "location": "gps",
+    "peak_g": 1.63,
+    "camera": {
+     "status": "done",
+     "verdict": "pothole",
+     "potholes": 2,
+     "speed_bumps": 0,
+     "cracks": 0,
+     "pothole_confidence": 0.789,
+     "speed_bump_confidence": null,
+     "defects": [
+      {
+       "kind": "pothole",
+       "severity": "medium",
+       "confidence": 0.789
+      },
+      {
+       "kind": "pothole",
+       "severity": "low",
+       "confidence": 0.384
+      }
+     ],
+     "time_ms": 6863,
+     "width": 640,
+     "height": 480,
+     "seconds_before": 1.5,
+     "frames_checked": 13
+    }
+   }
+  ],
+  "lat": 37.44928833333333,
+  "lng": 126.65822641666668,
+  "created_at": "2026-11-25T06:53:32.470Z",
+  "last_report_at": "2026-11-25T07:02:29.351Z",
+  "report_count": 2,
+  "peak_g": 1.63,
+  "severity": "critical",
+  "defect_type": "pothole",
+  "type_source": "camera"
+ },
+ {
+  "id": "027c3399-b240-4fbe-9013-623fb710f298",
+  "repair_status": "awaiting_repair",
+  "edited": [],
+  "reports": [
+   {
+    "time": "2026-11-25T06:53:34.380Z",
+    "lat": 37.44952933333333,
+    "lng": 126.65817616666666,
+    "image": "/captures/20261125-155334-681_up_labelled.jpg",
+    "reason": "up",
+    "location": "gps",
+    "peak_g": 0.76,
+    "camera": {
+     "status": "done",
+     "verdict": "pothole",
+     "potholes": 2,
+     "speed_bumps": 0,
+     "cracks": 0,
+     "pothole_confidence": 0.445,
+     "speed_bump_confidence": null,
+     "defects": [
+      {
+       "kind": "pothole",
+       "severity": "medium",
+       "confidence": 0.445
+      },
+      {
+       "kind": "pothole",
+       "severity": "medium",
+       "confidence": 0.315
+      }
+     ],
+     "time_ms": 6556,
+     "width": 640,
+     "height": 480,
+     "seconds_before": 1.0,
+     "frames_checked": 13
+    }
+   },
+   {
+    "time": "2026-11-25T06:53:41.539Z",
+    "lat": 37.449517,
+    "lng": 126.6582035,
+    "image": "/captures/20261125-155341-840_up_labelled.jpg",
+    "reason": "up",
+    "location": "gps",
+    "peak_g": 0.69,
+    "camera": {
+     "status": "done",
+     "verdict": "pothole",
+     "potholes": 1,
+     "speed_bumps": 0,
+     "cracks": 0,
+     "pothole_confidence": 0.637,
+     "speed_bump_confidence": null,
+     "defects": [
+      {
+       "kind": "pothole",
+       "severity": "medium",
+       "confidence": 0.637
+      }
+     ],
+     "time_ms": 6635,
+     "width": 640,
+     "height": 480,
+     "seconds_before": 1.0,
+     "frames_checked": 13
+    }
+   },
+   {
+    "time": "2026-11-25T06:53:44.102Z",
+    "lat": 37.44951316666666,
+    "lng": 126.6581765,
+    "image": "/captures/20261125-155344-410_up_labelled.jpg",
+    "reason": "up",
+    "location": "gps",
+    "peak_g": 1.62,
+    "camera": {
+     "status": "done",
+     "verdict": "pothole",
+     "potholes": 1,
+     "speed_bumps": 0,
+     "cracks": 0,
+     "pothole_confidence": 0.55,
+     "speed_bump_confidence": null,
+     "defects": [
+      {
+       "kind": "pothole",
+       "severity": "low",
+       "confidence": 0.55
+      }
+     ],
+     "time_ms": 6583,
+     "width": 640,
+     "height": 480,
+     "seconds_before": 0.0,
+     "frames_checked": 13
+    }
+   },
+   {
+    "time": "2026-11-25T06:53:46.099Z",
+    "lat": 37.4494885,
+    "lng": 126.65814983333333,
+    "image": "/captures/20261125-155346-401_up_labelled.jpg",
+    "reason": "up",
+    "location": "gps",
+    "peak_g": 1.69,
+    "camera": {
+     "status": "done",
+     "verdict": "pothole",
+     "potholes": 1,
+     "speed_bumps": 0,
+     "cracks": 0,
+     "pothole_confidence": 0.574,
+     "speed_bump_confidence": null,
+     "defects": [
+      {
+       "kind": "pothole",
+       "severity": "low",
+       "confidence": 0.574
+      }
+     ],
+     "time_ms": 6644,
+     "width": 640,
+     "height": 480,
+     "seconds_before": 0.9,
+     "frames_checked": 13
+    }
+   }
+  ],
+  "lat": 37.449512,
+  "lng": 126.6581765,
+  "created_at": "2026-11-25T06:53:34.380Z",
+  "last_report_at": "2026-11-25T06:53:46.099Z",
+  "report_count": 4,
+  "peak_g": 1.69,
+  "severity": "critical",
+  "defect_type": "pothole",
+  "type_source": "camera"
+ },
+ {
+  "id": "eac5884e-edd4-49ef-bf52-e5e4119e5a02",
+  "repair_status": "awaiting_repair",
+  "edited": [],
+  "reports": [
+   {
+    "time": "2026-11-25T06:54:28.390Z",
+    "lat": 37.449081666666665,
+    "lng": 126.65837183333333,
+    "image": "/captures/20261125-155428-700_up_labelled.jpg",
+    "reason": "up",
+    "location": "gps",
+    "peak_g": 0.56,
+    "camera": {
+     "status": "done",
+     "verdict": "pothole",
+     "potholes": 2,
+     "speed_bumps": 0,
+     "cracks": 0,
+     "pothole_confidence": 0.637,
+     "speed_bump_confidence": null,
+     "defects": [
+      {
+       "kind": "pothole",
+       "severity": "medium",
+       "confidence": 0.637
+      },
+      {
+       "kind": "pothole",
+       "severity": "low",
+       "confidence": 0.439
+      }
+     ],
+     "time_ms": 6763,
+     "width": 640,
+     "height": 480,
+     "seconds_before": 4.9,
+     "frames_checked": 13
+    }
+   },
+   {
+    "time": "2026-11-25T06:59:27.476Z",
+    "lat": 37.44905166666667,
+    "lng": 126.65841016666667,
+    "image": "/captures/20261125-155927-777_down.jpg",
+    "reason": "down",
+    "location": "gps",
+    "peak_g": 2.1,
+    "camera": null
+   },
+   {
+    "time": "2026-11-25T06:59:25.644Z",
+    "lat": 37.44905466666667,
+    "lng": 126.65841366666668,
+    "image": "/captures/20261125-155925-945_up_labelled.jpg",
+    "reason": "up",
+    "location": "gps",
+    "peak_g": 0.82,
+    "camera": {
+     "status": "done",
+     "verdict": "pothole",
+     "potholes": 1,
+     "speed_bumps": 0,
+     "cracks": 0,
+     "pothole_confidence": 0.513,
+     "speed_bump_confidence": null,
+     "defects": [
+      {
+       "kind": "pothole",
+       "severity": "medium",
+       "confidence": 0.513
+      }
+     ],
+     "time_ms": 6880,
+     "width": 640,
+     "height": 480,
+     "seconds_before": 0.5,
+     "frames_checked": 13
+    }
+   }
+  ],
+  "lat": 37.44906266666667,
+  "lng": 126.65839855555555,
+  "created_at": "2026-11-25T06:54:28.390Z",
+  "last_report_at": "2026-11-25T06:59:27.476Z",
+  "report_count": 3,
+  "peak_g": 2.1,
+  "severity": "critical",
+  "defect_type": "pothole",
+  "type_source": "camera"
+ },
+ {
+  "id": "a3c95070-9bce-4bbb-941b-0d33b68e075d",
+  "repair_status": "awaiting_repair",
+  "edited": [],
+  "reports": [
+   {
+    "time": "2026-11-25T06:57:29.680Z",
+    "lat": 37.44956216666667,
+    "lng": 126.65787200000001,
+    "image": "/captures/20261125-155729-990_up_labelled.jpg",
+    "reason": "up",
+    "location": "gps",
+    "peak_g": 1.16,
+    "camera": {
+     "status": "done",
+     "verdict": "pothole",
+     "potholes": 1,
+     "speed_bumps": 0,
+     "cracks": 0,
+     "pothole_confidence": 0.317,
+     "speed_bump_confidence": null,
+     "defects": [
+      {
+       "kind": "pothole",
+       "severity": "high",
+       "confidence": 0.317
+      }
+     ],
+     "time_ms": 6911,
+     "width": 640,
+     "height": 480,
+     "seconds_before": 1.0,
+     "frames_checked": 13
+    }
+   }
+  ],
+  "lat": 37.44956216666667,
+  "lng": 126.65787200000001,
+  "created_at": "2026-11-25T06:57:29.680Z",
+  "last_report_at": "2026-11-25T06:57:29.680Z",
+  "report_count": 1,
+  "peak_g": 1.16,
+  "severity": "high",
+  "defect_type": "pothole",
+  "type_source": "camera"
+ },
+ {
+  "id": "bc62cd58-e707-4085-b1d6-f3bec68dbb45",
+  "repair_status": "awaiting_repair",
+  "edited": [],
+  "reports": [
+   {
+    "time": "2026-11-25T06:57:38.722Z",
+    "lat": 37.4495155,
+    "lng": 126.657893,
+    "image": "/captures/20261125-155739-023_up_labelled.jpg",
+    "reason": "up",
+    "location": "gps",
+    "peak_g": 0.52,
+    "camera": {
+     "status": "done",
+     "verdict": "pothole",
+     "potholes": 1,
+     "speed_bumps": 0,
+     "cracks": 0,
+     "pothole_confidence": 0.486,
+     "speed_bump_confidence": null,
+     "defects": [
+      {
+       "kind": "pothole",
+       "severity": "low",
+       "confidence": 0.486
+      }
+     ],
+     "time_ms": 6671,
+     "width": 640,
+     "height": 480,
+     "seconds_before": 2.0,
+     "frames_checked": 13
+    }
+   }
+  ],
+  "lat": 37.4495155,
+  "lng": 126.657893,
+  "created_at": "2026-11-25T06:57:38.722Z",
+  "last_report_at": "2026-11-25T06:57:38.722Z",
+  "report_count": 1,
+  "peak_g": 0.52,
+  "severity": "low",
+  "defect_type": "pothole",
+  "type_source": "camera"
+ },
+ {
+  "id": "38954643-9896-4b1b-aa39-63a845de5fec",
+  "repair_status": "awaiting_repair",
+  "edited": [],
+  "reports": [
+   {
+    "time": "2026-11-25T06:59:39.607Z",
+    "lat": 37.44905816666667,
+    "lng": 126.658324,
+    "image": "/captures/20261125-155939-918_down.jpg",
+    "reason": "down",
+    "location": "gps",
+    "peak_g": 0.7,
+    "camera": null
+   },
+   {
+    "time": "2026-11-25T06:59:10.555Z",
+    "lat": 37.44905266666667,
+    "lng": 126.65834533333333,
+    "image": "/captures/20261125-155910-865_up_labelled.jpg",
+    "reason": "up",
+    "location": "gps",
+    "peak_g": 0.94,
+    "camera": {
+     "status": "done",
+     "verdict": "pothole",
+     "potholes": 1,
+     "speed_bumps": 0,
+     "cracks": 0,
+     "pothole_confidence": 0.641,
+     "speed_bump_confidence": null,
+     "defects": [
+      {
+       "kind": "pothole",
+       "severity": "high",
+       "confidence": 0.641
+      }
+     ],
+     "time_ms": 6886,
+     "width": 640,
+     "height": 480,
+     "seconds_before": 0.5,
+     "frames_checked": 13
+    }
+   },
+   {
+    "time": "2026-11-25T06:59:18.827Z",
+    "lat": 37.44906983333333,
+    "lng": 126.65832233333335,
+    "image": "/captures/20261125-155919-128_up_labelled.jpg",
+    "reason": "up",
+    "location": "gps",
+    "peak_g": 2.57,
+    "camera": {
+     "status": "done",
+     "verdict": "pothole",
+     "potholes": 1,
+     "speed_bumps": 0,
+     "cracks": 0,
+     "pothole_confidence": 0.436,
+     "speed_bump_confidence": null,
+     "defects": [
+      {
+       "kind": "pothole",
+       "severity": "high",
+       "confidence": 0.436
+      }
+     ],
+     "time_ms": 6902,
+     "width": 640,
+     "height": 480,
+     "seconds_before": 1.5,
+     "frames_checked": 13
+    }
+   },
+   {
+    "time": "2026-11-25T06:59:20.755Z",
+    "lat": 37.44906583333333,
+    "lng": 126.65835066666665,
+    "image": "/captures/20261125-155921-056_down_labelled.jpg",
+    "reason": "down",
+    "location": "gps",
+    "peak_g": 0.65,
+    "camera": {
+     "status": "done",
+     "verdict": "pothole",
+     "potholes": 1,
+     "speed_bumps": 0,
+     "cracks": 0,
+     "pothole_confidence": 0.529,
+     "speed_bump_confidence": null,
+     "defects": [
+      {
+       "kind": "pothole",
+       "severity": "high",
+       "confidence": 0.529
+      }
+     ],
+     "time_ms": 6914,
+     "width": 640,
+     "height": 480,
+     "seconds_before": 3.0,
+     "frames_checked": 13
+    }
+   }
+  ],
+  "lat": 37.449061625,
+  "lng": 126.65833558333333,
+  "created_at": "2026-11-25T06:59:10.555Z",
+  "last_report_at": "2026-11-25T06:59:39.607Z",
+  "report_count": 4,
+  "peak_g": 2.57,
+  "severity": "critical",
+  "defect_type": "pothole",
+  "type_source": "camera"
+ },
+ {
+  "id": "3d80505d-f7cc-448c-9c74-8008f9a89dd9",
+  "repair_status": "awaiting_repair",
+  "edited": [],
+  "reports": [
+   {
+    "time": "2026-11-25T07:00:19.115Z",
+    "lat": 37.449109166666666,
+    "lng": 126.65887400000001,
+    "image": "/captures/20261125-160019-415_down_labelled.jpg",
+    "reason": "down",
+    "location": "gps",
+    "peak_g": 1.57,
+    "camera": {
+     "status": "done",
+     "verdict": "none",
+     "potholes": 0,
+     "speed_bumps": 0,
+     "cracks": 0,
+     "pothole_confidence": null,
+     "speed_bump_confidence": null,
+     "defects": [],
+     "time_ms": 6808,
+     "width": 640,
+     "height": 480,
+     "seconds_before": 0.0,
+     "frames_checked": 13
+    }
+   }
+  ],
+  "lat": 37.449109166666666,
+  "lng": 126.65887400000001,
+  "created_at": "2026-11-25T07:00:19.115Z",
+  "last_report_at": "2026-11-25T07:00:19.115Z",
+  "report_count": 1,
+  "peak_g": 1.57,
+  "severity": "high",
+  "defect_type": "pothole",
+  "type_source": "sensor"
+ },
+ {
+  "id": "913c50ee-ff88-46d7-a7b1-8e11971333fb",
+  "repair_status": "awaiting_repair",
+  "edited": [],
+  "reports": [
+   {
+    "time": "2026-11-25T07:01:39.588Z",
+    "lat": 37.448793,
+    "lng": 126.65842433333334,
+    "image": "/captures/20261125-160139-888_up_labelled.jpg",
+    "reason": "up",
+    "location": "gps",
+    "peak_g": 0.68,
+    "camera": {
+     "status": "done",
+     "verdict": "pothole",
+     "potholes": 2,
+     "speed_bumps": 0,
+     "cracks": 0,
+     "pothole_confidence": 0.802,
+     "speed_bump_confidence": null,
+     "defects": [
+      {
+       "kind": "pothole",
+       "severity": "medium",
+       "confidence": 0.802
+      },
+      {
+       "kind": "pothole",
+       "severity": "low",
+       "confidence": 0.347
+      }
+     ],
+     "time_ms": 6907,
+     "width": 640,
+     "height": 480,
+     "seconds_before": 1.5,
+     "frames_checked": 13
+    }
+   }
+  ],
+  "lat": 37.448793,
+  "lng": 126.65842433333334,
+  "created_at": "2026-11-25T07:01:39.588Z",
+  "last_report_at": "2026-11-25T07:01:39.588Z",
+  "report_count": 1,
+  "peak_g": 0.68,
+  "severity": "medium",
+  "defect_type": "pothole",
+  "type_source": "camera"
+ },
+ {
+  "id": "e5b7b14a-f6ec-4140-a2ab-a70d7b29afce",
+  "repair_status": "awaiting_repair",
+  "edited": [],
+  "reports": [
+   {
+    "time": "2026-11-25T07:02:07.159Z",
+    "lat": 37.44894133333333,
+    "lng": 126.65872216666666,
+    "image": "/captures/20261125-160207-462_up_labelled.jpg",
+    "reason": "up",
+    "location": "gps",
+    "peak_g": 0.84,
+    "camera": {
+     "status": "done",
+     "verdict": "pothole",
+     "potholes": 2,
+     "speed_bumps": 0,
+     "cracks": 0,
+     "pothole_confidence": 0.784,
+     "speed_bump_confidence": null,
+     "defects": [
+      {
+       "kind": "pothole",
+       "severity": "medium",
+       "confidence": 0.784
+      },
+      {
+       "kind": "pothole",
+       "severity": "low",
+       "confidence": 0.431
+      }
+     ],
+     "time_ms": 6925,
+     "width": 640,
+     "height": 480,
+     "seconds_before": 5.0,
+     "frames_checked": 13
+    }
+   }
+  ],
+  "lat": 37.44894133333333,
+  "lng": 126.65872216666666,
+  "created_at": "2026-11-25T07:02:07.159Z",
+  "last_report_at": "2026-11-25T07:02:07.159Z",
+  "report_count": 1,
+  "peak_g": 0.84,
+  "severity": "medium",
+  "defect_type": "pothole",
+  "type_source": "camera"
+ },
+ {
+  "id": "52df303b-0d8a-49ec-b821-2fe28646fd02",
+  "repair_status": "awaiting_repair",
+  "edited": [],
+  "reports": [
+   {
+    "time": "2026-11-25T07:02:24.591Z",
+    "lat": 37.44921216666667,
+    "lng": 126.6583345,
+    "image": "/captures/20261125-160224-891_up_labelled.jpg",
+    "reason": "up",
+    "location": "gps",
+    "peak_g": 0.58,
+    "camera": {
+     "status": "done",
+     "verdict": "pothole",
+     "potholes": 2,
+     "speed_bumps": 0,
+     "cracks": 0,
+     "pothole_confidence": 0.795,
+     "speed_bump_confidence": null,
+     "defects": [
+      {
+       "kind": "pothole",
+       "severity": "medium",
+       "confidence": 0.795
+      },
+      {
+       "kind": "pothole",
+       "severity": "low",
+       "confidence": 0.384
+      }
+     ],
+     "time_ms": 6927,
+     "width": 640,
+     "height": 480,
+     "seconds_before": 1.0,
+     "frames_checked": 13
+    }
+   },
+   {
+    "time": "2026-11-25T07:03:18.591Z",
+    "lat": 37.44922033333333,
+    "lng": 126.65833116666666,
+    "image": "/captures/20261125-160318-892_up_labelled.jpg",
+    "reason": "up",
+    "location": "gps",
+    "peak_g": 0.77,
+    "camera": {
+     "status": "done",
+     "verdict": "pothole",
+     "potholes": 2,
+     "speed_bumps": 0,
+     "cracks": 0,
+     "pothole_confidence": 0.349,
+     "speed_bump_confidence": null,
+     "defects": [
+      {
+       "kind": "pothole",
+       "severity": "low",
+       "confidence": 0.349
+      },
+      {
+       "kind": "pothole",
+       "severity": "low",
+       "confidence": 0.299
+      }
+     ],
+     "time_ms": 6910,
+     "width": 640,
+     "height": 480,
+     "seconds_before": 4.5,
+     "frames_checked": 13
+    }
+   }
+  ],
+  "lat": 37.44921625,
+  "lng": 126.65833283333333,
+  "created_at": "2026-11-25T07:02:24.591Z",
+  "last_report_at": "2026-11-25T07:03:18.591Z",
+  "report_count": 2,
+  "peak_g": 0.77,
+  "severity": "medium",
+  "defect_type": "pothole",
+  "type_source": "camera"
+ },
+ {
+  "id": "93eac51f-7baa-4700-8b38-f9ae539ba970",
+  "repair_status": "awaiting_repair",
+  "edited": [],
+  "reports": [
+   {
+    "time": "2026-11-25T07:03:28.111Z",
+    "lat": 37.44920916666667,
+    "lng": 126.65813099999998,
+    "image": "/captures/20261125-160328-412_up_labelled.jpg",
+    "reason": "up",
+    "location": "gps",
+    "peak_g": 0.53,
+    "camera": {
+     "status": "done",
+     "verdict": "pothole",
+     "potholes": 1,
+     "speed_bumps": 0,
+     "cracks": 0,
+     "pothole_confidence": 0.449,
+     "speed_bump_confidence": null,
+     "defects": [
+      {
+       "kind": "pothole",
+       "severity": "high",
+       "confidence": 0.449
+      }
+     ],
+     "time_ms": 6763,
+     "width": 640,
+     "height": 480,
+     "seconds_before": 5.5,
+     "frames_checked": 13
+    }
+   }
+  ],
+  "lat": 37.44920916666667,
+  "lng": 126.65813099999998,
+  "created_at": "2026-11-25T07:03:28.111Z",
+  "last_report_at": "2026-11-25T07:03:28.111Z",
+  "report_count": 1,
+  "peak_g": 0.53,
+  "severity": "low",
+  "defect_type": "pothole",
   "type_source": "camera"
  }
 ]
