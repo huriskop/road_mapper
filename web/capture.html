@@ -238,5 +238,6 @@
     fetch("/api/captures").then((r) => r.json()).then((d) => d.items.forEach(upsert)).catch(() => {});
     Bench.start();
   </script>
+  <script src="/web/detect.js"></script>
 </body>
 </html>

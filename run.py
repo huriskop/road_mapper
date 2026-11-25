@@ -24,7 +24,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
 from app.capture import CaptureStore, Trigger
-from app.detection import TYPES, Analyzer
+from app.detection import EXPECTED, TYPES, Analyzer
 from app.incidents import Incidents
 from app.sensors import Camera, Gps, Imu, now_iso
 
@@ -72,6 +72,10 @@ class Monitor:
     def to_map(self, item: dict) -> None:
         if item["reason"] == "manual":                        # a test photo, not a road event
             return
+        verdict = (item["analysis"] or {}).get("verdict")
+        kind = verdict if verdict and verdict != "none" else EXPECTED.get(item["reason"])
+        if kind and kind not in self.analyzer.detect:         # a type switched off on the pages
+            return self.store.update(item["id"], map={"status": f"{kind} not selected, not on the map"})
         if item["gps_fix"] and item["lat"] is not None:
             (lat, lng), source = (item["lat"], item["lng"]), "gps"
         elif self.fallback:
@@ -194,6 +198,10 @@ class Handler(BaseHTTPRequestHandler):
             if "enabled" in body:
                 t.enabled = bool(body["enabled"])
             self._json(t.info())
+        elif path == "/api/detect":                           # body: {"detect": ["pothole", "crack"]}
+            MON.analyzer.detect = parse_detect(",".join(body.get("detect", [])))
+            print(f"detecting: {', '.join(MON.analyzer.detect)}", flush=True)
+            self._json(MON.analyzer.info())
         elif path == "/api/snapshot":
             self._json(MON.trigger.manual())
         elif path == "/api/imu/zero":
