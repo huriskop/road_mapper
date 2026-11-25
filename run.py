@@ -6,7 +6,7 @@
     python3 run.py --roi 0.06,0.12,1,0.72                   # the camera looks at a picture on a screen
 
 Pages:  http://<pi-address>:8080/          equipment check (camera, MPU-6050, GPS)
-        http://<pi-address>:8080/capture   a jolt takes a photo, the detector labels it
+        http://<pi-address>:8080/capture   a jolt: the detector finds the defect in the 6 s of video before it
         http://<pi-address>:8080/map       detected defects on a map
         http://<pi-address>:8080/test      try the detector on your own photos
 
@@ -63,7 +63,7 @@ class Monitor:
     def __init__(self, args: argparse.Namespace) -> None:
         data = Path(args.data)
         self.fallback = args.fallback_location
-        self.imu, self.gps, self.camera = Imu(), Gps(args.gps_port, args.gps_baud), Camera()
+        self.imu, self.gps, self.camera = Imu(), Gps(args.gps_port, args.gps_baud), Camera(rotation=args.rotation)
         self.store = CaptureStore(data / "captures")
         self.incidents = Incidents(data / "incidents.json")
         self.analyzer = Analyzer(self.store, args.detect, args.pothole_conf, roi=args.roi, on_result=self.to_map)
@@ -247,6 +247,16 @@ class Handler(BaseHTTPRequestHandler):
             time.sleep(1 / VIDEO_FPS)
 
 
+def require_pi4() -> None:
+    """This program is made for the Raspberry Pi 4 (its camera, I2C, serial port and speed)."""
+    try:
+        model = Path("/proc/device-tree/model").read_bytes().rstrip(b"\0").decode(errors="replace")
+    except OSError:
+        model = "not a Raspberry Pi"
+    if "Raspberry Pi 4" not in model:
+        raise SystemExit(f"run.py runs only on the Raspberry Pi 4 (this is: {model}). Start it on the Pi.")
+
+
 def lan_address() -> str:
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
@@ -267,10 +277,13 @@ def main() -> None:
     ap.add_argument("--fallback-location", type=parse_location, metavar="LAT,LNG",
                     help="position for jolts while the GPS has no fix")
     ap.add_argument("--roi", type=parse_roi, metavar="X0,Y0,X1,Y1", help="analyze only this part of each photo (fractions)")
+    ap.add_argument("--rotation", type=int, choices=(0, 180), default=180,
+                    help="turn the camera picture (default 180: our camera is mounted upside down)")
     ap.add_argument("--gps-port", default="/dev/serial0")
     ap.add_argument("--gps-baud", type=int, default=0, help="0 = detect")
     ap.add_argument("--data", default=str(ROOT / "data"), help="folder for photos and incidents.json")
     args = ap.parse_args()
+    require_pi4()
     try:
         server = ThreadingHTTPServer(("0.0.0.0", args.port), Handler)
     except OSError as exc:

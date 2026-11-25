@@ -127,7 +127,9 @@
       if (a.potholes) parts.push(`${a.potholes} pothole${a.potholes > 1 ? "s" : ""}${pct(a.pothole_confidence)}`);
       if (a.speed_bumps) parts.push(`${a.speed_bumps} speed bump${a.speed_bumps > 1 ? "s" : ""}${pct(a.speed_bump_confidence)}`);
       if (a.cracks) parts.push(`${a.cracks} crack${a.cracks > 1 ? "s" : ""}`);
-      return [a.verdict, "camera: " + (parts.join(" · ") || "nothing found") + ` · ${(a.time_ms / 1000).toFixed(1)} s`];
+      const when = a.seconds_before !== undefined
+        ? ` · best of ${a.frames_checked} frames, ${a.seconds_before.toFixed(1)} s before the jolt` : "";
+      return [a.verdict, "camera: " + (parts.join(" · ") || "nothing found") + when + ` · ${(a.time_ms / 1000).toFixed(1)} s`];
     }
 
     function agreement(item) {
@@ -163,6 +165,13 @@
         chip.className = "chip " + item.analysis.verdict;
         chip.textContent = VERDICT[item.analysis.verdict];
         cam.prepend(chip, " ");
+      }
+      if (item.video) {
+        const v = document.createElement("a");
+        v.href = item.video;
+        v.download = "";
+        v.textContent = `video of the ${item.clip_s ?? 6} s before the jolt (.avi)`;
+        line("", "").append(v);
       }
       const agree = agreement(item);
       if (agree) line("agree " + agree[0], agree[1]);

@@ -5,6 +5,10 @@ Without it, vision_detector falls back to the older models and image rules.
 
 A photo takes seconds on a Pi, so captures are analyzed in one background worker: the
 100 Hz sensor loop and the photo trigger never wait for it.
+
+A jolt comes with the 6 s of video before it (the camera has already passed the hole when the wheel
+hits it). One frame every SCAN_STEP_S is checked (13 frames, about 6 s on the Pi 4); the frame that
+shows the defect best becomes the capture's photo, and the clip is saved as a video.
 """
 from __future__ import annotations
 
@@ -17,6 +21,9 @@ from .capture import CaptureStore
 
 TYPES = ("pothole", "crack", "speed_bump")
 MAX_QUEUE = 5                                       # photos waiting; more than this are skipped
+SCAN_STEP_S = 0.5                                   # look-back: check one frame every this many seconds
+RANK = {"pothole": 3, "speed_bump": 3, "crack": 1, "none": 0}
+EXPECTED = {"down": "pothole", "up": "speed_bump"}  # what the jolt's direction suggests
 Roi = tuple[float, float, float, float]
 
 
@@ -51,7 +58,7 @@ class Analyzer:
                 "detect": list(self.detect), "roi": self.roi, "models": self.models, "queued": self.queue.qsize(),
                 "last_ms": self.last_ms}
 
-    def submit(self, item: dict, frame: bytes | None, name: str | None) -> None:
+    def submit(self, item: dict, frame: bytes | None, name: str | None, clip: list | None = None) -> None:
         if not frame or not name:
             self._finish(item["id"], analysis={"status": "skipped", "message": "no photo: the camera sent no frame"})
         elif self.vd is None:
@@ -60,7 +67,7 @@ class Analyzer:
             self._finish(item["id"], analysis={"status": "skipped", "message": "detector busy, photo skipped"})
         else:
             self.store.update(item["id"], analysis={"status": "queued"})
-            self.queue.put((item["id"], frame, name))
+            self.queue.put((item["id"], frame, name, clip))
 
     def _finish(self, item_id: int, **fields) -> None:
         self.store.update(item_id, **fields)
@@ -80,20 +87,79 @@ class Analyzer:
         self.ready = True
         print(f"detector ready in {time.perf_counter() - t0:.1f} s; models: {self.models}", flush=True)
         while True:
-            item_id, frame, name = self.queue.get()
+            item_id, frame, name, clip = self.queue.get()
             self.store.update(item_id, analysis={"status": "running"})
+            stem = name.rsplit(".", 1)[0]
             try:
-                labelled, result = self.analyze(frame, self.detect, self.conf, self.roi)
-                out = name.rsplit(".", 1)[0] + "_labelled.jpg"
+                fields = {}
+                if clip:
+                    try:
+                        self.save_video(clip, self.store.dir / f"{stem}.avi")
+                        fields["video"] = f"/captures/{stem}.avi"
+                    except Exception as exc:          # no video, but still look for the defect
+                        print(f"could not save the video of capture {item_id}: {exc}", flush=True)
+                    best, labelled, result = self.scan(clip, EXPECTED.get((self.store.get(item_id) or {}).get("reason")))
+                    (self.store.dir / f"{stem}_best.jpg").write_bytes(best)
+                    fields["image"] = f"/captures/{stem}_best.jpg"
+                else:
+                    labelled, result = self.analyze(frame, self.detect, self.conf, self.roi)
+                out = stem + "_labelled.jpg"
                 (self.store.dir / out).write_bytes(labelled)
                 self.last_ms = result["time_ms"]
-                fields = {"annotated": f"/captures/{out}", "analysis": result}
+                fields.update(annotated=f"/captures/{out}", analysis=result)
             except Exception as exc:                  # a bad photo must not stop the worker
                 fields = {"analysis": {"status": "error", "message": str(exc)}}
             try:
                 self._finish(item_id, **fields)
             except Exception as exc:
                 print(f"could not record capture {item_id}: {exc}", flush=True)
+
+    def scan(self, clip: list[tuple[float, bytes]], expected: str | None) -> tuple[bytes, bytes, dict]:
+        """Check one frame every SCAN_STEP_S of the clip and keep the one that shows the defect best:
+        the type the jolt suggests first, then any pothole or bump, then cracks; the most confident wins.
+        Returns (that frame, its labelled copy, its result with seconds_before and frames_checked)."""
+        picks, last = [], None
+        for ago, jpg in clip:                         # oldest first
+            if last is None or last - ago >= SCAN_STEP_S - 0.01:     # 0.01: float rounding
+                picks.append((ago, jpg))
+                last = ago
+        if picks[-1][1] is not clip[-1][1]:
+            picks.append(clip[-1])                    # always include the moment of the jolt
+        best, total_ms = None, 0
+        for ago, jpg in picks:
+            try:
+                labelled, result = self.analyze(jpg, self.detect, self.conf, self.roi)
+            except ValueError:                        # a broken frame: skip it
+                continue
+            total_ms += result["time_ms"]
+            v = result["verdict"]
+            conf = result.get(f"{v}_confidence") or max((d["confidence"] or 0 for d in result["defects"]), default=0)
+            score = (v == expected and v != "none", RANK[v], conf, -ago)   # ties: the frame closest to the jolt
+            if best is None or score > best[0]:
+                best = (score, ago, jpg, labelled, result)
+        if best is None:
+            raise ValueError("no readable frame in the video")
+        _, ago, jpg, labelled, result = best
+        return jpg, labelled, {**result, "time_ms": total_ms, "seconds_before": round(ago, 1),
+                               "frames_checked": len(picks)}
+
+    def save_video(self, clip: list[tuple[float, bytes]], path) -> None:
+        """The clip as an MJPEG .avi, at the rate it was filmed."""
+        cv2, np = self.cv2, self.np
+        fps = (len(clip) - 1) / max(clip[0][0] - clip[-1][0], 1e-3) if len(clip) > 1 else 1.0
+        writer = None
+        try:
+            for _, jpg in clip:
+                bgr = cv2.imdecode(np.frombuffer(jpg, np.uint8), cv2.IMREAD_COLOR)
+                if bgr is None:
+                    continue
+                if writer is None:
+                    h, w = bgr.shape[:2]
+                    writer = cv2.VideoWriter(str(path), cv2.VideoWriter_fourcc(*"MJPG"), fps, (w, h))
+                writer.write(bgr)
+        finally:
+            if writer is not None:
+                writer.release()
 
     def analyze(self, photo: bytes, detect: tuple[str, ...], conf: float | None, roi: Roi | None = None) -> tuple[bytes, dict]:
         """(labelled JPEG, result) for one photo."""

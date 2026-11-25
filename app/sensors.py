@@ -323,23 +323,29 @@ class Camera:
 
     The video comes from the rpicam-vid program, which can be killed and restarted cleanly. A camera
     that cannot be opened or stops sending frames is reported as an error and restarted until it
-    works. Meanwhile latest() returns no frame, so an old picture is never saved as a new photo."""
+    works. Meanwhile latest() returns no frame, so an old picture is never saved as a new photo.
+
+    It also keeps the last BUFFER_S seconds of frames (about 7 MB at 640x480, 20 fps): by the time a
+    wheel hits a pothole the camera has already passed it, so the detector looks back through them."""
 
     STALL_S = 3.0        # no frame for this long: restart the camera
     STALE_S = 1.0        # a frame older than this is not a photo of "now"
     RETRY_S = 2.0        # pause before each restart
+    BUFFER_S = 6.5       # seconds of video kept in memory (a little over the 6 s look-back)
     END = b"\xff\xd9"    # last two bytes of every JPEG
 
-    def __init__(self, size: tuple[int, int] = (640, 480), fps: int = 15) -> None:
+    def __init__(self, size: tuple[int, int] = (640, 480), fps: int = 20, rotation: int = 180) -> None:
+        """rotation: 180 for a camera mounted upside down (ours is), 0 otherwise."""
         self.error: str | None = None
         self.size, self.fps = size, 0.0
         self.command = ["rpicam-vid", "--nopreview", "--timeout", "0", "--width", str(size[0]), "--height", str(size[1]),
-                        "--framerate", str(fps), "--codec", "mjpeg", "--quality", "80", "--flush", "--output", "-"]
+                        "--framerate", str(fps), "--rotation", str(rotation), "--codec", "mjpeg", "--quality", "80", "--flush", "--output", "-"]
         self.restarts = 0
         self._stop = threading.Event()
         self._frame: bytes | None = None
         self._frame_at = 0.0                                  # time.monotonic() of the latest frame
         self._seq = 0
+        self._recent: collections.deque[tuple[float, bytes]] = collections.deque()   # (time.monotonic(), JPEG)
         self._cond = threading.Condition()
         self._thread = threading.Thread(target=self._run, daemon=True, name="camera")
         self._thread.start()
@@ -370,6 +376,9 @@ class Camera:
                         now = time.monotonic()
                         with self._cond:
                             self._frame, self._frame_at = frame, now
+                            self._recent.append((now, frame))
+                            while now - self._recent[0][0] > self.BUFFER_S:
+                                self._recent.popleft()
                             self._seq += 1
                             self._cond.notify_all()
                         self.fps = 0.9 * self.fps + 0.1 / max(now - last, 1e-3)
@@ -377,6 +386,8 @@ class Camera:
                 except Exception as exc:
                     self.restarts += 1
                     self.error = f"camera not working: {self._why(exc, log)}. Restarting it (attempt {self.restarts})"
+                    with self._cond:
+                        self._recent.clear()                  # a gap in the video: start the buffer again
                 self._end(proc)
             self._stop.wait(self.RETRY_S)
 
@@ -414,6 +425,12 @@ class Camera:
         """The current frame, or None when the camera has stopped sending them."""
         with self._cond:
             return self._frame if self._fresh() else None
+
+    def recent(self, seconds: float) -> list[tuple[float, bytes]]:
+        """The video of the last `seconds`, oldest first, as (seconds before now, JPEG)."""
+        now = time.monotonic()
+        with self._cond:
+            return [(now - t, f) for t, f in self._recent if now - t <= seconds]
 
     def wait(self, seq: int, timeout: float = 2.0) -> tuple[bytes | None, int]:
         """Block until a frame newer than seq exists."""

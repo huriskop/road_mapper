@@ -22,9 +22,11 @@ class CaptureStore:
         self.items: collections.deque[dict] = collections.deque(maxlen=keep)
         self.last_id = 0
         self.seq = 0
-        self.on_add: list = []          # called as f(item, frame, file_name) after a photo is saved
+        self.on_add: list = []          # called as f(item, frame, file_name, clip) after a photo is saved
 
-    def add(self, frame: bytes | None, reason: str, peak_g: float | None, gps: dict, when: str) -> dict:
+    def add(self, frame: bytes | None, reason: str, peak_g: float | None, gps: dict, when: str,
+            clip: list[tuple[float, bytes]] | None = None) -> dict:
+        """clip: the video before the jolt as (seconds before the jolt, JPEG), oldest first."""
         name = None
         if frame:
             stamp = datetime.now().strftime("%Y%m%d-%H%M%S-%f")[:-3]
@@ -40,12 +42,13 @@ class CaptureStore:
                 "lat": gps.get("lat"), "lng": gps.get("lng"), "gps_fix": gps.get("fix"),
                 "speed_kmh": gps.get("speed_kmh"),
                 "annotated": None, "analysis": None,
+                "clip_s": round(clip[0][0], 1) if clip else None, "video": None,
             }
             self.seq += 1
             item["seq"] = self.seq
             self.items.append(item)
         for f in self.on_add:
-            f(item, frame, name)
+            f(item, frame, name, clip)
         return dict(item)
 
     def update(self, item_id: int, **fields) -> None:
@@ -74,11 +77,13 @@ class CaptureStore:
 class Trigger:
     """Takes a photo when the vertical acceleration passes the threshold.
 
-    The photo is grabbed at the first sample over the threshold (the moment of the jolt);
-    the peak is then measured over the next 0.3 s, and nothing fires during the refractory
+    The photo is grabbed at the first sample over the threshold (the moment of the jolt), together
+    with the last LOOKBACK_S seconds of video: at that moment the car is already over the hole, so the
+    camera no longer sees it, and the detector looks for it in the frames before. The peak is then measured over the next 0.3 s, and nothing fires during the refractory
     time, so the front and rear wheels on the same hole give one photo."""
 
     WINDOW_S = 0.3
+    LOOKBACK_S = 6.0
 
     def __init__(self, imu: Imu, camera: Camera, gps: Gps, store: CaptureStore,
                  threshold_g: float = 0.4, refractory_s: float = 1.5) -> None:
@@ -101,12 +106,12 @@ class Trigger:
                 self._active = False
                 self._quiet_until = t + self.refractory
                 threading.Thread(target=self.store.add, daemon=True, args=(
-                    p["frame"], p["reason"], p["peak"], p["gps"], p["when"])).start()
+                    p["frame"], p["reason"], p["peak"], p["gps"], p["when"], p["clip"])).start()
             return
         if not self.enabled or self.imu.calibrating or t < self._quiet_until or abs(dyn) < self.threshold:
             return
         self._pending = {"t0": t, "peak": dyn, "reason": "up" if dyn > 0 else "down", "frame": self.camera.latest(),
-                         "gps": self.gps.snapshot(), "when": now_iso()}
+                         "clip": self.camera.recent(self.LOOKBACK_S), "gps": self.gps.snapshot(), "when": now_iso()}
         self._active = True
 
     def manual(self) -> dict:
